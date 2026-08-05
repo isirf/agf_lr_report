@@ -1,5 +1,5 @@
 ---
-title: "Infopoints - Data Quality Check"
+#title: "Infopoints - Data Quality Check"
 format:
   html:
     toc: false
@@ -21,266 +21,245 @@ execute:
 ```{r setup}
 pacman::p_load(tidyverse, knitr, janitor, readxl, reactable, htmltools, base64enc, plotly, jsonlite)
 
-# -------------------------------------------------------------------------
-# CONFIG — set these for each run. Filenames are date-stamped exports that
+# config — set these for each run. filenames are date-stamped exports that
 # change every time, so they're entered explicitly rather than auto-detected.
-# -------------------------------------------------------------------------
-version_number <- "1.1"
+version_number = "1.1"
 
-base_path  <- "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/"
-input_path <- paste0(base_path, "input_files/")
+base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/"
+input_path = paste0(base_path, "input_files/")
 
-# ↓↓↓ update these three for every new export ↓↓↓
-infopoints_file          <- "Customized_InfoLocations_privates_LR_2026_08_03.csv"
-infopoints_enriched_file <- "infopoints_enriched_2026_05_08.csv"
-excel_file               <- "LR_Report_Gemeinden_2027_07_27.xlsx"
-fttx_file                <- "Queries_FttxLocations_2026_08_04.csv"
-baulos_lookup_fttx_file  <- "baulos_lookup_fttx_2026_08_04.csv"
+# ↓↓↓ update these for every new export ↓↓↓
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_03.csv"
+infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
+excel_file               = "LR_Report_Gemeinden_2027_07_27.xlsx"
+fttx_file                = "Queries_FttxLocations_2026_08_04.csv"
+baulos_lookup_file       = "baulos_lookup_2026_08_05.csv"
+baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_08_04.csv"
 # ↑↑↑ update these for every new export ↑↑↑
 
-fttx_path                <- "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/"
+fttx_path                = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/"
 
-infopoints_path          <- paste0(input_path, infopoints_file)
-infopoints_enriched_path <- paste0(input_path, infopoints_enriched_file)
-excel_path               <- paste0(input_path, excel_file)
+infopoints_path          = paste0(input_path, infopoints_file)
+infopoints_enriched_path = paste0(input_path, infopoints_enriched_file)
+excel_path               = paste0(input_path, excel_file)
 
-# Export date parsed from infopoints_file's name (format: ..._YYYY_MM_DD,
-# optionally followed by .csv or a same-day suffix like _evening). Matched
+# export date parsed from infopoints_file's name (format: ..._YYYY_MM_DD,
+# optionally followed by .csv or a same-day suffix like _evening). matched
 # anywhere in the string rather than anchored to the end, since the exact
 # trailing text varies (.csv extension, _evening, etc.).
-infopoints_export_date <- infopoints_file |>
-  str_extract("\\d{4}_\\d{2}_\\d{2}") |>
+infopoints_export_date = infopoints_file %>%
+  str_extract("\\d{4}_\\d{2}_\\d{2}") %>%
   str_replace_all("_", "-")
-if (is.na(infopoints_export_date)) infopoints_export_date <- "unbekannt"
+if (is.na(infopoints_export_date)) infopoints_export_date = "unbekannt"
 
-# Weekly org-wide status trend summary for Kapitel 6, sheet "Statusentwicklung"
+# weekly org-wide status trend summary for kapitel 6, sheet "Statusentwicklung"
 # (already excludes on-hold projects — see the sheet's own title cell).
-# Columns: Datum (text, e.g. "KW 06"), abgelehnt, angesucht, erhalten, offen,
-# storniert, no response. One row per week, starting row 3 (header row 2).
-lr_status_history_path <- paste0(base_path, "input_files/lr_report_pia/LR-Statusentwicklung_piha_neu.xlsx")
+# columns: datum (text, e.g. "KW 06"), abgelehnt, angesucht, erhalten, offen,
+# storniert, no response. one row per week, starting row 3 (header row 2).
+lr_status_history_path = paste0(base_path, "input_files/lr_report_pia/LR-Statusentwicklung_piha_neu.xlsx")
 
 # fail fast with a clear message rather than a cryptic read_csv2 error
-all_input_files <- c(infopoints_path, infopoints_enriched_path, excel_path, lr_status_history_path)
-missing_files   <- all_input_files[!file.exists(all_input_files)]
+all_input_files = c(infopoints_path, infopoints_enriched_path, excel_path, lr_status_history_path)
+missing_files   = all_input_files[!file.exists(all_input_files)]
 
 if (length(missing_files) > 0) {
   stop(
-    "File(s) not found — check filenames in the CONFIG block:\n  ",
+    "file(s) not found — check filenames in the config block:\n  ",
     paste(missing_files, collapse = "\n  ")
   )
 }
 
-# -------------------------------------------------------------------------
 # load infopoints
-# -------------------------------------------------------------------------
-infopoints_all <- read_csv2(
-  infopoints_path,
-  name_repair = "minimal"
-) |>
+infopoints_all = read_csv2(infopoints_path, name_repair = "minimal") %>%
   select(-last_col())
 
-yes_no_cols <- c("built", "Payment required", "canceled", "payed")
-infopoints_all <- infopoints_all |>
+yes_no_cols = c("built", "Payment required", "canceled", "payed")
+infopoints_all = infopoints_all %>%
   mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
 
-# -------------------------------------------------------------------------
-# load full project list for Quellen page
-# -------------------------------------------------------------------------
-project_list_full <- read_excel(
-  excel_path,
-  sheet = "Gemeinde PB Zuordnung"
-)
+# load full project list for quellen page
+project_list_full = read_excel(excel_path, sheet = "Gemeinde PB Zuordnung")
 
-# -------------------------------------------------------------------------
 # active projects (not on hold)
-# -------------------------------------------------------------------------
-project_list <- project_list_full |>
+project_list = project_list_full %>%
   rename(
     `Planned by` = Gemeinden,
     LR_Akquise   = `LR-Akquise`,
     Bau_Planung  = `Bau/Planung`
-  ) |>
-  filter(Bau_Planung != "on hold") |>
+  ) %>%
+  filter(Bau_Planung != "on hold") %>%
   select(`Planned by`, PB, PCM, LR_Akquise, Bau_Planung,
-         ende_bau_passiv_plan, project_id_ods) |>
+         ende_bau_passiv_plan, project_id_ods) %>%
   distinct()
 
-meilenstein_projects <- unique(project_list$`Planned by`)
+meilenstein_projects = unique(project_list$`Planned by`)
 
-# all active-project infopoints (including canceled) — used for KPI counts
-infopoints_active <- infopoints_all |>
-  filter(`Planned by` %in% meilenstein_projects) |>
+# all active-project infopoints (including canceled) — used for kpi counts
+infopoints_active = infopoints_all %>%
+  filter(`Planned by` %in% meilenstein_projects) %>%
   left_join(project_list, by = "Planned by")
 
 # main analysis dataset: active projects, non-canceled only
-infopoints <- infopoints_active |>
+infopoints = infopoints_active %>%
   filter(is.na(Status) | str_to_lower(str_trim(Status)) != "canceled")
 
-# Costs_numeric needed throughout
-infopoints <- infopoints |>
+# costs_numeric needed throughout
+infopoints = infopoints %>%
   mutate(
-    Costs_numeric = Costs |>
-      str_extract("\\d+[,.]?\\d*") |>
-      str_replace(",", ".") |>
+    Costs_numeric = Costs %>%
+      str_extract("\\d+[,.]?\\d*") %>%
+      str_replace(",", ".") %>%
       as.numeric()
   )
 
-# ── join spatial enrichment (from preprocessing.R) ────────────────────────
-# NOTE (2026-07): built_trasses, trasse_count, trasse_length_m, and
-# length_without_permission_m are currently unused — Section 6.6, the only
+# join spatial enrichment (from preprocessing.R)
+# note (2026-07): built_trasses, trasse_count, trasse_length_m, and
+# length_without_permission_m are currently unused — section 6.6, the only
 # consumer of this data, is commented out pending verification of how
 # preprocessing.R aggregates trasse rows per infopoint (possible 1:many
-# relationship would double-count meters — see note at old Section 6.6).
-# Re-enable the columns below alongside that section once resolved.
-infopoints_enriched_cols <- read_csv2(
-  infopoints_enriched_path,
-  name_repair = "minimal"
-) |>
+# relationship would double-count meters — see note at old section 6.6).
+# re-enable the columns below alongside that section once resolved.
+infopoints_enriched_cols = read_csv2(infopoints_enriched_path, name_repair = "minimal") %>%
   select(`External ID`
          # , built_trasses, trasse_count,
          # trasse_length_m, length_without_permission_m
          )
 
-infopoints <- infopoints |>
+infopoints = infopoints %>%
   left_join(infopoints_enriched_cols, by = "External ID")
 
-# ── Baulos lookup (pre-computed by preprocessing_baulos.R) ───────────────────
-# Run preprocessing_baulos.R once whenever the GeoJSON or infopoints CSV
-# changes. That script does the spatial intersection and writes baulos_lookup.csv.
-baulos_lookup_path <- paste0(input_path, "baulos_lookup_2026_08_05.csv")
+# baulos lookup (pre-computed by preprocessing_baulos.R)
+# run preprocessing_baulos.R once whenever the geojson or infopoints csv
+# changes. that script does the spatial intersection and writes baulos_lookup.csv.
+baulos_lookup_path = paste0(input_path, baulos_lookup_file)
 
 if (file.exists(baulos_lookup_path)) {
-  baulos_lookup <- read_csv(baulos_lookup_path, show_col_types = FALSE)
+  baulos_lookup = read_csv(baulos_lookup_path, show_col_types = FALSE)
 } else {
   warning("baulos_lookup.csv not found — run preprocessing_baulos.R first. ",
-          "Baulos filter will be empty.")
-  baulos_lookup <- tibble(`External ID` = character(),
-                          `Planned by`  = character(),
-                          baulos_name   = character())
+          "baulos filter will be empty.")
+  baulos_lookup = tibble(`External ID` = character(),
+                         `Planned by`  = character(),
+                         baulos_name   = character())
 }
 
-# Per-project list of distinct Baulos names (for the JS dropdown)
-pp_baulos_by_project <- baulos_lookup |>
-  distinct(`Planned by`, baulos_name) |>
+# per-project list of distinct baulos names (for the js dropdown)
+pp_baulos_by_project = baulos_lookup %>%
+  distinct(`Planned by`, baulos_name) %>%
   arrange(`Planned by`, baulos_name)
 
-# ── FttX Locations ────────────────────────────────────────────────────────────
-fttx_full_path       <- paste0(fttx_path, fttx_file)
-baulos_fttx_path     <- paste0(input_path, baulos_lookup_fttx_file)
+# fttx locations
+fttx_full_path   = paste0(fttx_path, fttx_file)
+baulos_fttx_path = paste0(input_path, baulos_lookup_fttx_file)
 
-SCOPING_LEVELS <- c("In Scope", "Outside Build Scope", "Non Connectable", "NA / leer")
+SCOPING_LEVELS = c("In Scope", "Outside Build Scope", "Non Connectable", "NA / leer")
 
 if (file.exists(fttx_full_path)) {
-  fttx_raw <- read_csv2(fttx_full_path, name_repair = "unique",
-                        show_col_types = FALSE)
+  fttx_raw = read_csv2(fttx_full_path, name_repair = "unique", show_col_types = FALSE)
 
-  # Select only the columns we need before renaming — avoids issues with
+  # select only the columns we need before renaming — avoids issues with
   # duplicate or empty column names in the raw export
-  fttx_raw <- fttx_raw |>
-    select(`External ID`, `POP cluster`, Scoping, `Planned TU`,
-           Latitude, Longitude)
+  fttx_raw = fttx_raw %>%
+    select(`External ID`, `POP cluster`, Scoping, `Planned TU`, Latitude, Longitude)
 
-  # Normalise: replace NA/empty Scoping with label, coerce Planned TU to numeric
-  fttx <- fttx_raw |>
-    rename(`Planned by` = `POP cluster`) |>
-    filter(!is.na(`Planned by`) & `Planned by` != "") |>
-    filter(`Planned by` %in% meilenstein_projects) |>
+  # normalise: replace na/empty scoping with label, coerce planned tu to numeric
+  fttx = fttx_raw %>%
+    rename(`Planned by` = `POP cluster`) %>%
+    filter(!is.na(`Planned by`) & `Planned by` != "") %>%
+    filter(`Planned by` %in% meilenstein_projects) %>%
     mutate(
-      Scoping     = if_else(is.na(Scoping) | str_trim(Scoping) == "",
-                            "NA / leer", str_trim(Scoping)),
+      Scoping      = if_else(is.na(Scoping) | str_trim(Scoping) == "",
+                             "NA / leer", str_trim(Scoping)),
       `Planned TU` = suppressWarnings(as.numeric(
                        str_replace(as.character(`Planned TU`), ",", ".")
                      ))
     )
 
-  # Baulos lookup for FttX (produced by preprocessing_baulos.R)
+  # baulos lookup for fttx (produced by preprocessing_baulos.R)
   if (file.exists(baulos_fttx_path)) {
-    baulos_lookup_fttx <- read_csv(baulos_fttx_path, show_col_types = FALSE) |>
+    baulos_lookup_fttx = read_csv(baulos_fttx_path, show_col_types = FALSE) %>%
       rename(`Planned by` = `POP cluster`)
   } else {
     warning("baulos_lookup_fttx not found — run preprocessing_baulos.R first.")
-    baulos_lookup_fttx <- tibble(`External ID` = character(),
-                                 `Planned by`  = character(),
-                                 baulos_name   = character())
+    baulos_lookup_fttx = tibble(`External ID` = character(),
+                                `Planned by`  = character(),
+                                baulos_name   = character())
   }
 
-  fttx <- fttx |>
-    left_join(baulos_lookup_fttx |> select(`External ID`, baulos_name),
-              by = "External ID")
+  fttx = fttx %>%
+    left_join(baulos_lookup_fttx %>% select(`External ID`, baulos_name), by = "External ID")
 
 } else {
-  warning("FttX file not found — FttX card will be empty.")
-  fttx <- tibble(`External ID` = character(), `Planned by` = character(),
-                 Scoping = character(), `Planned TU` = numeric(),
-                 baulos_name = character())
+  warning("fttx file not found — fttx card will be empty.")
+  fttx = tibble(`External ID` = character(), `Planned by` = character(),
+                Scoping = character(), `Planned TU` = numeric(),
+                baulos_name = character())
 }
 
-n_total_all            <- nrow(infopoints_all)
-n_total_active         <- nrow(infopoints_active)
-n_canceled              <- nrow(infopoints_active) - nrow(infopoints)
-n_total                <- nrow(infopoints)   # non-canceled active
-# NOTE (2026-07): n_projects_all previously counted distinct "Planned by"
-# strings found in the raw infopoints CSV — this could diverge from the
+n_total_all           = nrow(infopoints_all)
+n_total_active        = nrow(infopoints_active)
+n_canceled            = nrow(infopoints_active) - nrow(infopoints)
+n_total               = nrow(infopoints)   # non-canceled active
+# note (2026-07): n_projects_all previously counted distinct "planned by"
+# strings found in the raw infopoints csv — this could diverge from the
 # actual project list (typos, stale names, projects with 0 infopoints so
-# far) and did not match the Excel's own count of active projects. Fixed to
-# count directly from the Excel project list, the source of truth.
-n_projects_all          <- project_list_full |>
-  filter(`Bau/Planung` != "on hold") |>
-  distinct(Gemeinden) |>
+# far) and did not match the excel's own count of active projects. fixed to
+# count directly from the excel project list, the source of truth.
+n_projects_all        = project_list_full %>%
+  filter(`Bau/Planung` != "on hold") %>%
+  distinct(Gemeinden) %>%
   nrow()
-n_projects_meilenstein  <- n_distinct(infopoints$`Planned by`, na.rm = TRUE)
-today                   <- Sys.Date()
+n_projects_meilenstein = n_distinct(infopoints$`Planned by`, na.rm = TRUE)
+today                  = Sys.Date()
 
-# -------------------------------------------------------------------------
 # helpers
-# -------------------------------------------------------------------------
-pct <- function(x, total = n_total) {
+pct = function(x, total = n_total) {
   paste0(x, " (", round(100 * x / total, 1), "%)")
 }
 
-na_label <- function(df, col = "Status") {
-  df |> mutate(!!col := if_else(is.na(.data[[col]]) | .data[[col]] == "", "NA / leer", .data[[col]]))
+na_label = function(df, col = "Status") {
+  df %>% mutate(!!col := if_else(is.na(.data[[col]]) | .data[[col]] == "", "NA / leer", .data[[col]]))
 }
 
-add_col_totals <- function(df) {
-  label_col    <- names(df)[1]
-  numeric_cols <- names(df)[sapply(df, is.numeric)]
-  col_sums <- df |>
-    summarise(across(all_of(numeric_cols), sum)) |>
+add_col_totals = function(df) {
+  label_col    = names(df)[1]
+  numeric_cols = names(df)[sapply(df, is.numeric)]
+  col_sums = df %>%
+    summarise(across(all_of(numeric_cols), sum)) %>%
     mutate(!!label_col := "Total")
   bind_rows(df, col_sums)
 }
 
-add_pct_cols <- function(df, pct_base) {
-  label_col    <- names(df)[1]
-  numeric_cols <- names(df)[sapply(df, is.numeric)]
-  text_cols    <- setdiff(names(df)[-1], numeric_cols)
-  result <- df |> select(all_of(label_col))
-  for (col in text_cols)    result[[col]] <- df[[col]]
+add_pct_cols = function(df, pct_base) {
+  label_col    = names(df)[1]
+  numeric_cols = names(df)[sapply(df, is.numeric)]
+  text_cols    = setdiff(names(df)[-1], numeric_cols)
+  result = df %>% select(all_of(label_col))
+  for (col in text_cols)    result[[col]] = df[[col]]
   for (col in numeric_cols) {
-    base            <- if (is.character(pct_base)) df[[pct_base]] else pct_base
-    result[[col]]               <- df[[col]]
-    result[[paste0(col, " %")]] <- round(100 * df[[col]] / base, 1)
+    base                        = if (is.character(pct_base)) df[[pct_base]] else pct_base
+    result[[col]]               = df[[col]]
+    result[[paste0(col, " %")]] = round(100 * df[[col]] / base, 1)
   }
   result
 }
 
-rt <- function(df, title = NULL,
-               highlight_rows  = NULL,
-               highlight_bg    = "#fff3cd",
-               highlight_color = "#856404",
-               na_leer_row     = TRUE) {
-  label_col <- names(df)[1]
-  data_rows <- df |> filter(.data[[label_col]] != "Total")
-  total_row <- df |> filter(.data[[label_col]] == "Total")
-  has_total <- nrow(total_row) > 0
+rt = function(df, title = NULL,
+              highlight_rows  = NULL,
+              highlight_bg    = "#fff3cd",
+              highlight_color = "#856404",
+              na_leer_row     = TRUE) {
+  label_col = names(df)[1]
+  data_rows = df %>% filter(.data[[label_col]] != "Total")
+  total_row = df %>% filter(.data[[label_col]] == "Total")
+  has_total = nrow(total_row) > 0
 
-  pct_cols <- names(df)[str_detect(names(df), "%$")]
-  num_cols <- names(df)[sapply(df, is.numeric)]
+  pct_cols = names(df)[str_detect(names(df), "%$")]
+  num_cols = names(df)[sapply(df, is.numeric)]
 
-  make_footer <- function(col) {
+  make_footer = function(col) {
     if (!has_total) return(NULL)
-    val <- total_row[[col]]
+    val = total_row[[col]]
     if (col %in% pct_cols) {
       function(values, name) tags$b(paste0(val, "%"), style = "color:#fff; font-size:0.85em;")
     } else {
@@ -288,7 +267,7 @@ rt <- function(df, title = NULL,
     }
   }
 
-  col_defs <- lapply(names(df), function(col) {
+  col_defs = lapply(names(df), function(col) {
     if (col %in% pct_cols) {
       colDef(name = col, align = "right", minWidth = 70,
              style = list(color = "#888", fontSize = "0.85em"),
@@ -301,18 +280,18 @@ rt <- function(df, title = NULL,
              footer = if (has_total) function(values, name) tags$b("Total", style = "color:#fff;") else NULL)
     }
   })
-  names(col_defs) <- names(df)
+  names(col_defs) = names(df)
 
-  flagged_amber <- highlight_rows
-  flagged_red   <- if (na_leer_row && label_col == "Status") "NA / leer" else NULL
+  flagged_amber = highlight_rows
+  flagged_red   = if (na_leer_row && label_col == "Status") "NA / leer" else NULL
 
-  row_style_fn <- if (!is.null(flagged_amber) || !is.null(flagged_red)) {
-    bg_a  <- highlight_bg;    fg_a <- highlight_color
-    bg_r  <- "#fde8e8";       fg_r <- "#c0392b"
-    lbl   <- label_col
-    fa    <- flagged_amber;   fr   <- flagged_red
+  row_style_fn = if (!is.null(flagged_amber) || !is.null(flagged_red)) {
+    bg_a  = highlight_bg;    fg_a = highlight_color
+    bg_r  = "#fde8e8";       fg_r = "#c0392b"
+    lbl   = label_col
+    fa    = flagged_amber;   fr   = flagged_red
     function(index) {
-      val <- data_rows[[lbl]][index]
+      val = data_rows[[lbl]][index]
       if (!is.null(fr) && val %in% fr)
         list(background = bg_r, color = fg_r, fontWeight = "600",
              borderLeft = paste0("3px solid ", fg_r))
@@ -323,7 +302,7 @@ rt <- function(df, title = NULL,
     }
   } else NULL
 
-  tbl <- reactable(
+  tbl = reactable(
     data_rows,
     columns         = col_defs,
     rowStyle        = row_style_fn,
@@ -346,18 +325,18 @@ rt <- function(df, title = NULL,
   )
 }
 
-na_status_callout <- function(df, col = "Status") {
+na_status_callout = function(df, col = "Status") {
   # accepts either a pre-grouped summary (with Total col) or raw infopoints
   if (!("Total" %in% names(df))) {
-    df <- df |>
-      na_label(col) |>
-      group_by(.data[[col]]) |>
-      summarise(Total = n(), .groups = "drop") |>
+    df = df %>%
+      na_label(col) %>%
+      group_by(.data[[col]]) %>%
+      summarise(Total = n(), .groups = "drop") %>%
       rename(Status = all_of(col))
   } else {
-    df <- df |> na_label(col) |> rename(Status = all_of(col))
+    df = df %>% na_label(col) %>% rename(Status = all_of(col))
   }
-  na_row <- df |> filter(Status == "NA / leer")
+  na_row = df %>% filter(Status == "NA / leer")
   if (nrow(na_row) > 0 && na_row$Total > 0) {
     cat(paste0(
       "\n::: {.callout-warning}\n",
@@ -369,20 +348,20 @@ na_status_callout <- function(df, col = "Status") {
   }
 }
 
-download_btn <- function(summary_df, raw_df, filename_summary, filename_raw) {
-  make_csv_uri <- function(df) {
-    csv_text <- paste(
+download_btn = function(summary_df, raw_df, filename_summary, filename_raw) {
+  make_csv_uri = function(df) {
+    csv_text = paste(
       capture.output(write.csv(df, stdout(), row.names = FALSE)),
       collapse = "\n"
     )
-    encoded <- base64enc::base64encode(charToRaw(csv_text))
+    encoded = base64enc::base64encode(charToRaw(csv_text))
     paste0("data:text/csv;base64,", encoded)
   }
 
-  uri_summary <- make_csv_uri(summary_df)
-  uri_raw     <- make_csv_uri(raw_df)
+  uri_summary = make_csv_uri(summary_df)
+  uri_raw     = make_csv_uri(raw_df)
 
-  btn_style <- paste0(
+  btn_style = paste0(
     "display:inline-block; margin:4px 6px 12px 0;",
     "padding:5px 12px; font-size:0.8em; border-radius:4px;",
     "border:none; cursor:pointer; text-decoration:none; color:white;"
@@ -471,7 +450,7 @@ main#quarto-document-content {
   word-break: break-word;
 }
 
-/* ---- KPI summary boxes ---- */
+/* ---- kpi summary boxes ---- */
 .kpi-grid {
   display: flex;
   flex-wrap: wrap;
@@ -506,7 +485,7 @@ main#quarto-document-content {
   margin: 0 4px;
 }
 
-/* ---- KPI groups ---- */
+/* ---- kpi groups ---- */
 .kpi-section { margin-bottom: 20px; }
 .kpi-section-label {
   font-size: 0.72em;
@@ -610,139 +589,142 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 ```
 
+```{r dynamic-title, results='asis'}
+# inject the report title with the infopoints export date into the html
+cat(sprintf(
+  '<h1 style="margin-top:1em; color:#2c3e50;">Infopoints — Data Quality Check <small style="font-size:0.55em; color:#888; font-weight:400;">Datenstand: %s</small></h1>',
+  infopoints_export_date
+))
+```
+
 ::: {.panel-tabset}
 
 ## Executive Summary
 
 ```{r exec-summary-data}
-# --- Missing / flagged Status ---
-n_no_status            <- sum(is.na(infopoints$Status) | infopoints$Status == "")
-n_no_response          <- sum(str_to_lower(str_trim(infopoints$Status)) == "no response", na.rm = TRUE)
-n_built_yes_no_receive <- infopoints |>
-  filter(built == "Yes" & (is.na(Status) | Status != "receive")) |> nrow()
+# missing / flagged status
+n_no_status            = sum(is.na(infopoints$Status) | infopoints$Status == "")
+n_no_response          = sum(str_to_lower(str_trim(infopoints$Status)) == "no response", na.rm = TRUE)
+n_built_yes_no_receive = infopoints %>%
+  filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>% nrow()
 
-# --- Status counts for Status-Verteilung KPI group ---
-n_status_receive     <- sum(infopoints$Status == "receive",     na.rm = TRUE)
-n_status_open        <- sum(infopoints$Status == "open",        na.rm = TRUE)
-n_status_applied     <- sum(infopoints$Status == "applied for", na.rm = TRUE)
-n_status_rejected    <- sum(infopoints$Status == "rejected",    na.rm = TRUE)
-n_status_no_response <- sum(str_to_lower(str_trim(infopoints$Status)) == "no response", na.rm = TRUE)
-n_status_na          <- sum(is.na(infopoints$Status) | infopoints$Status == "")
+# status counts for status-verteilung kpi group
+n_status_receive     = sum(infopoints$Status == "receive",     na.rm = TRUE)
+n_status_open        = sum(infopoints$Status == "open",        na.rm = TRUE)
+n_status_applied     = sum(infopoints$Status == "applied for", na.rm = TRUE)
+n_status_rejected    = sum(infopoints$Status == "rejected",    na.rm = TRUE)
+n_status_no_response = sum(str_to_lower(str_trim(infopoints$Status)) == "no response", na.rm = TRUE)
+n_status_na          = sum(is.na(infopoints$Status) | infopoints$Status == "")
 
-# --- Abgeltungen: Datenchecks ---
-n_payment_yes         <- sum(infopoints$`Payment required` == "Yes", na.rm = TRUE)
-n_payment_yes_no_cost <- infopoints |>
-  filter(`Payment required` == "Yes" & (is.na(Costs) | Costs == "")) |> nrow()
-costs_format_issues   <- infopoints |>
-  filter(!is.na(Costs) & Costs != "") |>
-  filter(str_detect(Costs, "x|\\(|€.*€")) |> nrow()
-n_costs_but_no_pay    <- infopoints |>
-  filter(!is.na(Costs_numeric) & Costs_numeric > 0 & `Payment required` == "No") |> nrow()
+# abgeltungen: datenchecks
+n_payment_yes         = sum(infopoints$`Payment required` == "Yes", na.rm = TRUE)
+n_payment_yes_no_cost = infopoints %>%
+  filter(`Payment required` == "Yes" & (is.na(Costs) | Costs == "")) %>% nrow()
+costs_format_issues   = infopoints %>%
+  filter(!is.na(Costs) & Costs != "") %>%
+  filter(str_detect(Costs, "x|\\(|€.*€")) %>% nrow()
+n_costs_but_no_pay    = infopoints %>%
+  filter(!is.na(Costs_numeric) & Costs_numeric > 0 & `Payment required` == "No") %>% nrow()
 
-# --- Abgeltungen: Qualifikationstrichter (Payment = Yes als Basis) ---
-pay_yes_exec          <- infopoints |> filter(`Payment required` == "Yes")
-n_qualifiziert        <- pay_yes_exec |> filter(built == "Yes" & Status == "receive") |> nrow()
-n_nicht_gebaut_no_rcv <- pay_yes_exec |> filter(built != "Yes" & Status != "receive") |> nrow()
-n_gebaut_no_rcv       <- pay_yes_exec |> filter(built == "Yes" & Status != "receive") |> nrow()
-n_rcv_no_built        <- pay_yes_exec |> filter(built != "Yes" & Status == "receive") |> nrow()
+# abgeltungen: qualifikationstrichter (payment = yes als basis)
+pay_yes_exec          = infopoints %>% filter(`Payment required` == "Yes")
+n_qualifiziert        = pay_yes_exec %>% filter(built == "Yes" & Status == "receive") %>% nrow()
+n_nicht_gebaut_no_rcv = pay_yes_exec %>% filter(built != "Yes" & Status != "receive") %>% nrow()
+n_gebaut_no_rcv       = pay_yes_exec %>% filter(built == "Yes" & Status != "receive") %>% nrow()
+n_rcv_no_built        = pay_yes_exec %>% filter(built != "Yes" & Status == "receive") %>% nrow()
 
-# --- Abgeltungen: Aktionsgruppen (receive + built) ---
-recv_built_exec   <- infopoints |> filter(Status == "receive" & built == "Yes")
-n_recv_built_exec <- nrow(recv_built_exec)
-n_gruppe_a        <- recv_built_exec |> filter(`Payment required` == "Yes" & !is.na(Costs_numeric) & Costs_numeric > 0) |> nrow()
-n_gruppe_b        <- recv_built_exec |> filter(`Payment required` == "Yes" & (is.na(Costs_numeric) | Costs_numeric == 0)) |> nrow()
+# abgeltungen: aktionsgruppen (receive + built)
+recv_built_exec   = infopoints %>% filter(Status == "receive" & built == "Yes")
+n_recv_built_exec = nrow(recv_built_exec)
+n_gruppe_a        = recv_built_exec %>% filter(`Payment required` == "Yes" & !is.na(Costs_numeric) & Costs_numeric > 0) %>% nrow()
+n_gruppe_b        = recv_built_exec %>% filter(`Payment required` == "Yes" & (is.na(Costs_numeric) | Costs_numeric == 0)) %>% nrow()
 
-# --- Built ---
-n_built_leer           <- sum(is.na(infopoints$built) | infopoints$built == "")
-n_built_yes_no_receive <- infopoints |>
-  filter(built == "Yes" & (is.na(Status) | Status != "receive")) |> nrow()
+# built
+n_built_leer           = sum(is.na(infopoints$built) | infopoints$built == "")
+n_built_yes_no_receive = infopoints %>%
+  filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>% nrow()
 
-# --- Applied for ---
-applied_for_exec <- infopoints |>
-  filter(Status == "applied for") |>
+# applied for
+applied_for_exec = infopoints %>%
+  filter(Status == "applied for") %>%
   mutate(
     requested_on = as.Date(`Requested on`, format = "%d.%m.%Y"),
     days_open    = as.numeric(today - requested_on),
     weeks_open   = days_open / 7
   )
-n_applied_for     <- nrow(applied_for_exec)
-n_applied_over12w <- sum(applied_for_exec$weeks_open >= 12, na.rm = TRUE)
+n_applied_for     = nrow(applied_for_exec)
+n_applied_over12w = sum(applied_for_exec$weeks_open >= 12, na.rm = TRUE)
 
-# --- HP dahinter ---
-n_hp_leer_exec <- infopoints |>
-  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "") |>
-  filter(!str_detect(str_to_lower(`Deviations`), "\\bvon\\b")) |> nrow()
+# hp dahinter
+n_hp_leer_exec = infopoints %>%
+  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "") %>%
+  filter(!str_detect(str_to_lower(`Deviations`), "\\bvon\\b")) %>% nrow()
 
-# --- Parcel ---
-n_missing_all_parcel <- infopoints |>
+# parcel
+n_missing_all_parcel = infopoints %>%
   filter(
     (is.na(`Lot number`)       | `Lot number`       == "") &
     (is.na(`Folio number`)     | `Folio number`     == "") &
     (is.na(`Cadastral Number`) | `Cadastral Number` == "")
-  ) |> nrow()
+  ) %>% nrow()
 
-# ── Feeder ohne LR ────────────────────────────────────────────────────────
-# Total: all Feeder-level infopoints not yet at Status = receive
-n_feeder_no_lr <- infopoints |>
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive")) |>
+# feeder ohne lr — total: all feeder-level infopoints not yet at status = receive
+n_feeder_no_lr = infopoints %>%
+  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive")) %>%
   nrow()
 
-# Broken down by Bau_Planung phase (all three phases present in the data)
-n_feeder_no_lr_planung    <- infopoints |>
+# broken down by bau_planung phase
+n_feeder_no_lr_planung    = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         Bau_Planung == "Planung") |> nrow()
-n_feeder_no_lr_im_bau     <- infopoints |>
+         Bau_Planung == "Planung") %>% nrow()
+n_feeder_no_lr_im_bau     = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         Bau_Planung == "im Bau") |> nrow()
-n_feeder_no_lr_bau_fertig <- infopoints |>
+         Bau_Planung == "im Bau") %>% nrow()
+n_feeder_no_lr_bau_fertig = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         Bau_Planung == "Bau fertig") |> nrow()
+         Bau_Planung == "Bau fertig") %>% nrow()
 
-# ── Feeder gebaut ohne LR ─────────────────────────────────────────────────
-# Total: subset of above that's also already built
-n_feeder_built_no_lr <- infopoints |>
+# feeder gebaut ohne lr — subset of above that's also already built
+n_feeder_built_no_lr = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         built == "Yes") |>
+         built == "Yes") %>%
   nrow()
 
-# Broken down by Bau_Planung phase
-n_feeder_built_no_lr_planung    <- infopoints |>
+# broken down by bau_planung phase
+n_feeder_built_no_lr_planung    = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         built == "Yes" & Bau_Planung == "Planung") |> nrow()
-n_feeder_built_no_lr_im_bau     <- infopoints |>
+         built == "Yes" & Bau_Planung == "Planung") %>% nrow()
+n_feeder_built_no_lr_im_bau     = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         built == "Yes" & Bau_Planung == "im Bau") |> nrow()
-n_feeder_built_no_lr_bau_fertig <- infopoints |>
+         built == "Yes" & Bau_Planung == "im Bau") %>% nrow()
+n_feeder_built_no_lr_bau_fertig = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
-         built == "Yes" & Bau_Planung == "Bau fertig") |> nrow()
+         built == "Yes" & Bau_Planung == "Bau fertig") %>% nrow()
 ```
 
 ```{r exec-kpi-boxes}
-kpi_box <- function(val, lbl, cls = "") {
+kpi_box = function(val, lbl, cls = "") {
   tags$div(class = paste("kpi-box", cls),
     tags$div(class = "kpi-val", val),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
-# Status box: number on line 1, % on line 2, label on line 3
-kpi_box_status <- function(n, pct_val, lbl, cls = "") {
+kpi_box_status = function(n, pct_val, lbl, cls = "") {
   tags$div(class = paste("kpi-box", cls),
     tags$div(class = "kpi-val", n),
     tags$div(class = "kpi-pct", paste0(pct_val, "%")),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
-# Gesamt box: bold label via extra CSS class
-kpi_box_gesamt <- function(val, lbl, cls = "") {
+kpi_box_gesamt = function(val, lbl, cls = "") {
   tags$div(class = paste("kpi-box gesamt", cls),
     tags$div(class = "kpi-val", val),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
-# Visual divider between feeder sub-groups
-kpi_divider <- function() tags$div(class = "kpi-divider")
+kpi_divider = function() tags$div(class = "kpi-divider")
 
-kpi_group <- function(label, ...) {
+kpi_group = function(label, ...) {
   tags$div(class = "kpi-section",
     tags$div(class = "kpi-section-label", label),
     tags$div(class = "kpi-grid", ...)
@@ -750,7 +732,6 @@ kpi_group <- function(label, ...) {
 }
 
 tagList(
-  # ── Datenbestand ──────────────────────────────────────────────────────
   kpi_group("Datenbestand",
     kpi_box(n_total_all,
             "Infopoints gesamt (alle Projekte inkl. on hold)"),
@@ -764,7 +745,6 @@ tagList(
             "ok")
   ),
 
-  # ── Infopunkte je Status ──────────────────────────────────────────────
   kpi_group("Infopunkte je Status",
     kpi_box_status(n_status_receive,
                    round(100 * n_status_receive     / n_total, 1),
@@ -788,7 +768,6 @@ tagList(
                    "NA / leer",   "warn")
   ),
 
-  # ── Datenqualität ─────────────────────────────────────────────────────
   kpi_group("Datenqualität",
     kpi_box(n_hp_leer_exec,
             paste0("HP behind fehlt (", round(100 * n_hp_leer_exec / n_total, 1), "% ohne storniert)"),
@@ -798,7 +777,6 @@ tagList(
             "warn")
   ),
 
-  # ── Leitungsrechte ────────────────────────────────────────────────────
   kpi_group("Leitungsrechte",
     kpi_box(n_built_yes_no_receive,
             paste0("Gebaut, aber Status ≠ receive (", round(100 * n_built_yes_no_receive / n_total, 1), "% ohne storniert)"),
@@ -823,7 +801,6 @@ tagList(
             "Feeder gebaut ohne LR — Bau fertig", "warn")
   ),
 
-  # ── Abgeltungen ───────────────────────────────────────────────────────
   kpi_group("Abgeltungen",
     kpi_box(n_payment_yes,
             paste0("Payment required = Yes (", round(100 * n_payment_yes / n_total, 1), "% ohne storniert)"),
@@ -854,31 +831,29 @@ Alle Zahlen und Prozentangaben beziehen sich auf **`r n_total` aktive, nicht sto
 ### 1.1 Status-Übersicht nach Projekt
 
 ```{r status-overview-by-project}
-# Include canceled here for the overview table (shown as reference)
-status_cols <- c("open", "applied for", "receive", "rejected", "no response", "canceled")
-
-status_overview <- infopoints_active |>
-  na_label() |>
-  group_by(Bau_Planung, PB, LR_Akquise, `Planned by`) |>
+# include canceled here for the overview table (shown as reference)
+status_overview = infopoints_active %>%
+  na_label() %>%
+  group_by(Bau_Planung, PB, LR_Akquise, `Planned by`) %>%
   summarise(
-    Leer            = sum(Status == "NA / leer",    na.rm = TRUE),
-    open            = sum(Status == "open",          na.rm = TRUE),
-    `applied for`   = sum(Status == "applied for",  na.rm = TRUE),
-    receive         = sum(Status == "receive",       na.rm = TRUE),
-    rejected        = sum(Status == "rejected",      na.rm = TRUE),
-    `no response`   = sum(Status == "no response",  na.rm = TRUE),
-    canceled        = sum(Status == "canceled",      na.rm = TRUE),
-    Gesamt          = n(),
+    Leer          = sum(Status == "NA / leer",   na.rm = TRUE),
+    open          = sum(Status == "open",         na.rm = TRUE),
+    `applied for` = sum(Status == "applied for", na.rm = TRUE),
+    receive       = sum(Status == "receive",      na.rm = TRUE),
+    rejected      = sum(Status == "rejected",     na.rm = TRUE),
+    `no response` = sum(Status == "no response", na.rm = TRUE),
+    canceled      = sum(Status == "canceled",     na.rm = TRUE),
+    Gesamt        = n(),
     .groups = "drop"
-  ) |>
-  arrange(Bau_Planung, `Planned by`) |>
-  adorn_totals("row") |>
+  ) %>%
+  arrange(Bau_Planung, `Planned by`) %>%
+  adorn_totals("row") %>%
   mutate(across(-c(Bau_Planung, PB, LR_Akquise, `Planned by`), as.numeric))
 ```
 
 ```{r status-overview-table}
 reactable(
-  status_overview |> filter(Bau_Planung != "Total"),
+  status_overview %>% filter(Bau_Planung != "Total"),
   columns = list(
     Bau_Planung   = colDef(name = "Bau/Planung", minWidth = 90,
                            footer = function(v, n) tags$b("Total", style="color:#fff")),
@@ -917,7 +892,7 @@ reactable(
   bordered        = TRUE,
   defaultPageSize = 30,
   theme = reactableTheme(
-    headerStyle = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
+    headerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
     stripedColor = "#f8f9fa",
     footerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold")
   )
@@ -927,7 +902,7 @@ reactable(
 ```{r dl-status-overview}
 download_btn(
   summary_df       = status_overview,
-  raw_df           = infopoints_active |>
+  raw_df           = infopoints_active %>%
     select(`External ID`, `Planned by`, Bau_Planung, PB, LR_Akquise, Status),
   filename_summary = "1-1_status_overview_summary.csv",
   filename_raw     = "1-1_status_overview_raw.csv"
@@ -939,14 +914,14 @@ download_btn(
 ### 1.2 Status und Building Type
 
 ```{r status-building-type}
-status_by_building_type <- infopoints |>
-  na_label() |>
-  group_by(Status, `Building Type`) |>
-  summarise(n = n(), .groups = "drop") |>
-  pivot_wider(names_from = `Building Type`, values_from = n, values_fill = 0) |>
-  add_col_totals() |>
-  mutate(Total = rowSums(across(where(is.numeric)))) |>
-  relocate(Total, .after = Status) |>
+status_by_building_type = infopoints %>%
+  na_label() %>%
+  group_by(Status, `Building Type`) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = `Building Type`, values_from = n, values_fill = 0) %>%
+  add_col_totals() %>%
+  mutate(Total = rowSums(across(where(is.numeric)))) %>%
+  relocate(Total, .after = Status) %>%
   add_pct_cols(pct_base = "Total")
 ```
 
@@ -957,7 +932,7 @@ rt(status_by_building_type, title = "Infopoints nach Status und Building Type")
 ```{r dl-status-building-type}
 download_btn(
   summary_df       = status_by_building_type,
-  raw_df           = infopoints |> select(`External ID`, `Planned by`, Status, `Building Type`),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, Status, `Building Type`),
   filename_summary = "1-2_status_building_type_summary.csv",
   filename_raw     = "1-2_status_building_type_raw.csv"
 )
@@ -972,14 +947,14 @@ na_status_callout(infopoints)
 ### 1.3 Status und FeederDrop Level
 
 ```{r status-feederdrop}
-status_by_feederdrop <- infopoints |>
-  na_label() |>
-  group_by(Status, `FeederDrop Level`) |>
-  summarise(n = n(), .groups = "drop") |>
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) |>
-  add_col_totals() |>
-  mutate(Total = rowSums(across(where(is.numeric)))) |>
-  relocate(Total, .after = Status) |>
+status_by_feederdrop = infopoints %>%
+  na_label() %>%
+  group_by(Status, `FeederDrop Level`) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
+  add_col_totals() %>%
+  mutate(Total = rowSums(across(where(is.numeric)))) %>%
+  relocate(Total, .after = Status) %>%
   add_pct_cols(pct_base = "Total")
 ```
 
@@ -990,7 +965,7 @@ rt(status_by_feederdrop, title = "Infopoints nach Status und FeederDrop Level")
 ```{r dl-status-feederdrop}
 download_btn(
   summary_df       = status_by_feederdrop,
-  raw_df           = infopoints |> select(`External ID`, `Planned by`, Status, `FeederDrop Level`),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, Status, `FeederDrop Level`),
   filename_summary = "1-3_status_feederdrop_summary.csv",
   filename_raw     = "1-3_status_feederdrop_raw.csv"
 )
@@ -1005,34 +980,34 @@ na_status_callout(infopoints)
 Projekte, bei denen Infopoints keinen FeederDrop Level eingetragen haben (weder Drop Level noch Feeder Level).
 
 ```{r feederdrop-missing-by-project}
-feederdrop_missing_by_project <- infopoints |>
-  group_by(`Planned by`, PB) |>
+feederdrop_missing_by_project = infopoints %>%
+  group_by(`Planned by`, PB) %>%
   summarise(
     Total          = n(),
     `Drop Level`   = sum(`FeederDrop Level` == "Drop Level",   na.rm = TRUE),
     `Feeder Level` = sum(`FeederDrop Level` == "Feeder Level", na.rm = TRUE),
     `NA`           = sum(is.na(`FeederDrop Level`) | `FeederDrop Level` == ""),
     .groups = "drop"
-  ) |>
-  filter(`NA` > 0) |>
-  arrange(desc(`NA`)) |>
-  adorn_totals("row") |>
-  mutate(across(c(Total, `Drop Level`, `Feeder Level`, `NA`), as.numeric)) |>
+  ) %>%
+  filter(`NA` > 0) %>%
+  arrange(desc(`NA`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(c(Total, `Drop Level`, `Feeder Level`, `NA`), as.numeric)) %>%
   add_pct_cols(pct_base = "Total")
 
-feederdrop_missing_by_pb <- infopoints |>
-  group_by(PB) |>
+feederdrop_missing_by_pb = infopoints %>%
+  group_by(PB) %>%
   summarise(
     Total          = n(),
     `Drop Level`   = sum(`FeederDrop Level` == "Drop Level",   na.rm = TRUE),
     `Feeder Level` = sum(`FeederDrop Level` == "Feeder Level", na.rm = TRUE),
     `NA`           = sum(is.na(`FeederDrop Level`) | `FeederDrop Level` == ""),
     .groups = "drop"
-  ) |>
-  filter(`NA` > 0) |>
-  arrange(desc(`NA`)) |>
-  adorn_totals("row") |>
-  mutate(across(c(Total, `Drop Level`, `Feeder Level`, `NA`), as.numeric)) |>
+  ) %>%
+  filter(`NA` > 0) %>%
+  arrange(desc(`NA`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(c(Total, `Drop Level`, `Feeder Level`, `NA`), as.numeric)) %>%
   add_pct_cols(pct_base = "Total")
 ```
 
@@ -1045,8 +1020,8 @@ rt(feederdrop_missing_by_pb, title = "Fehlende FeederDrop-Informationen nach PB"
 ```{r dl-feederdrop-missing-pb}
 download_btn(
   summary_df       = feederdrop_missing_by_pb,
-  raw_df           = infopoints |>
-    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") |>
+  raw_df           = infopoints %>%
+    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") %>%
     select(`External ID`, `Planned by`, PB, Status, `FeederDrop Level`),
   filename_summary = "1-3-1_feederdrop_missing_pb_summary.csv",
   filename_raw     = "1-3-1_feederdrop_missing_raw.csv"
@@ -1062,8 +1037,8 @@ rt(feederdrop_missing_by_project, title = "Fehlende FeederDrop-Informationen nac
 ```{r dl-feederdrop-missing-project}
 download_btn(
   summary_df       = feederdrop_missing_by_project,
-  raw_df           = infopoints |>
-    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") |>
+  raw_df           = infopoints %>%
+    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") %>%
     select(`External ID`, `Planned by`, PB, Status, `FeederDrop Level`),
   filename_summary = "1-3-1_feederdrop_missing_project_summary.csv",
   filename_raw     = "1-3-1_feederdrop_missing_project_raw.csv"
@@ -1081,47 +1056,45 @@ download_btn(
 Infopoints, bei denen eine Zahlung erforderlich ist, aber kein Kostenbetrag eingetragen wurde.
 
 ```{r payment-yes-no-costs}
-payment_yes_no_costs  <- infopoints |>
+payment_yes_no_costs  = infopoints %>%
   filter(`Payment required` == "Yes" & (is.na(Costs) | Costs == ""))
 
-n_payment_yes_no_costs <- nrow(payment_yes_no_costs)
+n_payment_yes_no_costs = nrow(payment_yes_no_costs)
 ```
 
 **Anzahl betroffener Infopoints:** `r pct(n_payment_yes_no_costs)`
 
 ```{r dl-payment-yes-no-costs}
 download_btn(
-  summary_df       = payment_yes_no_costs |> select(`External ID`, `Planned by`, `Payment required`, Costs),
+  summary_df       = payment_yes_no_costs %>% select(`External ID`, `Planned by`, `Payment required`, Costs),
   raw_df           = payment_yes_no_costs,
   filename_summary = "1-1-1_payment_yes_no_costs_summary.csv",
   filename_raw     = "1-1-1_payment_yes_no_costs_raw.csv"
 )
 ```
 
-<!-- Kommentar: Hier kannst du ergänzen, ob das ein bekanntes Problem ist -->
-
 ---
 
 #### 2.1.2 Costs > 0, aber Payment required = No
 
 ```{r costs-no-payment}
-costs_format_issues <- infopoints |>
-  filter(!is.na(Costs) & Costs != "") |>
+costs_format_issues = infopoints %>%
+  filter(!is.na(Costs) & Costs != "") %>%
   filter(str_detect(Costs, "x|\\(|€.*€"))
 
-n_costs_format_issues  <- nrow(costs_format_issues)
+n_costs_format_issues  = nrow(costs_format_issues)
 
-costs_but_no_payment   <- infopoints |>
+costs_but_no_payment   = infopoints %>%
   filter(!is.na(Costs_numeric) & Costs_numeric > 0 & `Payment required` == "No")
 
-n_costs_but_no_payment <- nrow(costs_but_no_payment)
+n_costs_but_no_payment = nrow(costs_but_no_payment)
 ```
 
 **Anzahl betroffener Infopoints:** `r pct(n_costs_but_no_payment)`
 
 ```{r dl-costs-no-payment}
 download_btn(
-  summary_df       = costs_but_no_payment |> select(`External ID`, `Planned by`, `Payment required`, Costs, Costs_numeric),
+  summary_df       = costs_but_no_payment %>% select(`External ID`, `Planned by`, `Payment required`, Costs, Costs_numeric),
   raw_df           = costs_but_no_payment,
   filename_summary = "1-1-2_costs_no_payment_summary.csv",
   filename_raw     = "1-1-2_costs_no_payment_raw.csv"
@@ -1138,14 +1111,9 @@ download_btn(
 
 Infopoints mit **Payment required = Yes** — Fortschrittstrichter pro Projekt. Eine Abgeltung gilt als **vollständig qualifiziert**, wenn beide Bedingungen erfüllt sind: `Built = Yes` **und** `Status = receive`. Nicht qualifizierte Infopoints werden nach Ablehnungsgrund aufgeschlüsselt.
 
-- **Nicht gebaut & kein receive**: weder gebaut noch Status = receive (kein Fortschritt)
-- **Gebaut, kein receive**: gebaut, aber Status noch nicht auf "receive" gesetzt
-- **Receive, nicht gebaut**: Status = receive, aber `built` noch nicht = Yes
-- **Qualifiziert (Built & receive)**: beide Bedingungen erfüllt → Abgeltung auszahlungsbereit
-
 ```{r abgeltung-receive-by-project}
-abgeltung_by_project <- pay_yes_exec |>
-  group_by(`Planned by`, PB) |>
+abgeltung_by_project = pay_yes_exec %>%
+  group_by(`Planned by`, PB) %>%
   summarise(
     `Payment = Yes`                  = n(),
     `Qualifiziert (Built & receive)` = sum(built == "Yes" & Status == "receive", na.rm = TRUE),
@@ -1153,16 +1121,16 @@ abgeltung_by_project <- pay_yes_exec |>
     `Gebaut, kein receive`           = sum(built == "Yes" & Status != "receive", na.rm = TRUE),
     `Receive, nicht gebaut`          = sum(built != "Yes" & Status == "receive", na.rm = TRUE),
     .groups = "drop"
-  ) |>
-  arrange(desc(`Payment = Yes`)) |>
-  adorn_totals("row") |>
-  mutate(across(-c(`Planned by`, PB), as.numeric)) |>
+  ) %>%
+  arrange(desc(`Payment = Yes`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(-c(`Planned by`, PB), as.numeric)) %>%
   mutate(
-    `Qualifiziert %`                  = round(100 * `Qualifiziert (Built & receive)` / `Payment = Yes`, 1),
-    `Nicht gebaut & kein receive %`   = round(100 * `Nicht gebaut & kein receive`    / `Payment = Yes`, 1),
-    `Gebaut, kein receive %`          = round(100 * `Gebaut, kein receive`            / `Payment = Yes`, 1),
-    `Receive, nicht gebaut %`         = round(100 * `Receive, nicht gebaut`           / `Payment = Yes`, 1)
-  ) |>
+    `Qualifiziert %`                = round(100 * `Qualifiziert (Built & receive)` / `Payment = Yes`, 1),
+    `Nicht gebaut & kein receive %` = round(100 * `Nicht gebaut & kein receive`    / `Payment = Yes`, 1),
+    `Gebaut, kein receive %`        = round(100 * `Gebaut, kein receive`            / `Payment = Yes`, 1),
+    `Receive, nicht gebaut %`       = round(100 * `Receive, nicht gebaut`           / `Payment = Yes`, 1)
+  ) %>%
   select(
     `Planned by`, PB,
     `Payment = Yes`,
@@ -1180,7 +1148,7 @@ rt(abgeltung_by_project, title = "Abgeltungen nach Projekt: Qualifikationsstatus
 ```{r dl-abgeltung-receive}
 download_btn(
   summary_df       = abgeltung_by_project,
-  raw_df           = pay_yes_exec |>
+  raw_df           = pay_yes_exec %>%
     select(`External ID`, `Planned by`, PB, Status, built, Costs, Costs_numeric),
   filename_summary = "1-1-3_abgeltung_qualifikation_summary.csv",
   filename_raw     = "1-1-3_abgeltung_qualifikation_raw.csv"
@@ -1191,38 +1159,34 @@ download_btn(
 
 #### 2.1.4 Abgeltungen: Handlungsbedarf — receive + gebaut
 
-Infopoints mit `Status = receive` **und** `Built = Yes` — LR bereits erhalten, Infopoint gebaut. Aufgeteilt nach zwei Aktionsgruppen basierend auf den Kostendaten. Gruppe B enthält per Filter auch Einträge mit `Payment required = No` (kein Geld fällig, können direkt bereinigt werden).
+Infopoints mit `Status = receive` **und** `Built = Yes` — LR bereits erhalten, Infopoint gebaut.
 
 ::: {.callout-note}
-**Gruppe A — Zahlen & "payed" setzen:** `Payment required = Yes` und `Costs > 0` → Rechnung liegt vor, Abgeltung ist fällig. Status auf "payed" setzen.
+**Gruppe A — Zahlen & "payed" setzen:** `Payment required = Yes` und `Costs > 0` → Rechnung liegt vor, Abgeltung ist fällig.
 
-**Gruppe B — Klären:** `Payment required = Yes` und `Costs leer` → Unklar ob wirklich keine Kosten anfallen oder ob das Feld vergessen wurde. Manuell prüfen. _Tipp: mit dem Filter auf `Payment required = No` einschränken um Einträge zu finden, die wir selbst bereinigen können._
+**Gruppe B — Klären:** `Payment required = Yes` und `Costs leer` → Unklar ob wirklich keine Kosten anfallen oder ob das Feld vergessen wurde.
 :::
 
 ```{r abgeltung-action-data}
-# Base: receive + built
-recv_built <- infopoints |>
-  filter(Status == "receive" & built == "Yes")
+recv_built   = infopoints %>% filter(Status == "receive" & built == "Yes")
+n_recv_built = nrow(recv_built)
 
-n_recv_built <- nrow(recv_built)
-
-# Per-project breakdown: A and B only
-action_by_project <- recv_built |>
-  group_by(`Planned by`, PB) |>
+action_by_project = recv_built %>%
+  group_by(`Planned by`, PB) %>%
   summarise(
     `Receive & Built` = n(),
     `A: Zahlen`       = sum(`Payment required` == "Yes" & !is.na(Costs_numeric) & Costs_numeric > 0, na.rm = TRUE),
     `B: Klären`       = sum(`Payment required` == "Yes" & (is.na(Costs_numeric) | Costs_numeric == 0), na.rm = TRUE),
     .groups = "drop"
-  ) |>
-  filter(`Receive & Built` > 0) |>
-  arrange(desc(`Receive & Built`)) |>
-  adorn_totals("row") |>
-  mutate(across(-c(`Planned by`, PB), as.numeric)) |>
+  ) %>%
+  filter(`Receive & Built` > 0) %>%
+  arrange(desc(`Receive & Built`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(-c(`Planned by`, PB), as.numeric)) %>%
   mutate(
     `A: Zahlen %` = round(100 * `A: Zahlen` / `Receive & Built`, 1),
     `B: Klären %` = round(100 * `B: Klären` / `Receive & Built`, 1)
-  ) |>
+  ) %>%
   select(
     `Planned by`, PB, `Receive & Built`,
     `A: Zahlen`, `A: Zahlen %`,
@@ -1239,7 +1203,7 @@ rt(action_by_project, title = "Handlungsbedarf nach Projekt (receive + gebaut)")
 ```{r dl-action-project}
 download_btn(
   summary_df       = action_by_project,
-  raw_df           = recv_built |>
+  raw_df           = recv_built %>%
     select(`External ID`, `Planned by`, PB, Status, built, `Payment required`, Costs, Costs_numeric),
   filename_summary = "1-1-4_action_project_summary.csv",
   filename_raw     = "1-1-4_action_project_raw.csv"
@@ -1253,38 +1217,38 @@ download_btn(
 #### 2.2.1 Status von "built" pro Projekt
 
 ```{r built-by-project}
-built_summary <- infopoints |>
-  group_by(`Planned by`, PB) |>
+built_summary = infopoints %>%
+  group_by(`Planned by`, PB) %>%
   summarise(
     Total         = n(),
     `Built: Yes`  = sum(built == "Yes", na.rm = TRUE),
     `Built: No`   = sum(built == "No",  na.rm = TRUE),
     `Built: leer` = sum(is.na(built) | built == ""),
     .groups = "drop"
-  ) |>
-  arrange(`Planned by`) |>
-  adorn_totals("row") |>
-  mutate(across(c(`Built: Yes`, `Built: No`, `Built: leer`), as.numeric)) |>
+  ) %>%
+  arrange(`Planned by`) %>%
+  adorn_totals("row") %>%
+  mutate(across(c(`Built: Yes`, `Built: No`, `Built: leer`), as.numeric)) %>%
   add_pct_cols(pct_base = "Total")
 
-projects_always_no  <- infopoints |> group_by(`Planned by`, PB) |>
-  summarise(Total = n(), `Built: No`  = sum(built == "No",  na.rm = TRUE), .groups = "drop") |>
+projects_always_no  = infopoints %>% group_by(`Planned by`, PB) %>%
+  summarise(Total = n(), `Built: No`  = sum(built == "No",  na.rm = TRUE), .groups = "drop") %>%
   filter(`Built: No`  == Total)
-projects_always_yes <- infopoints |> group_by(`Planned by`, PB) |>
-  summarise(Total = n(), `Built: Yes` = sum(built == "Yes", na.rm = TRUE), .groups = "drop") |>
+projects_always_yes = infopoints %>% group_by(`Planned by`, PB) %>%
+  summarise(Total = n(), `Built: Yes` = sum(built == "Yes", na.rm = TRUE), .groups = "drop") %>%
   filter(`Built: Yes` == Total)
-projects_zero_yes   <- infopoints |> group_by(`Planned by`, PB) |>
-  summarise(Total = n(), `Built: Yes` = sum(built == "Yes", na.rm = TRUE), .groups = "drop") |>
+projects_zero_yes   = infopoints %>% group_by(`Planned by`, PB) %>%
+  summarise(Total = n(), `Built: Yes` = sum(built == "Yes", na.rm = TRUE), .groups = "drop") %>%
   filter(`Built: Yes` == 0)
-projects_zero_no    <- infopoints |> group_by(`Planned by`, PB) |>
-  summarise(Total = n(), `Built: No`  = sum(built == "No",  na.rm = TRUE), .groups = "drop") |>
+projects_zero_no    = infopoints %>% group_by(`Planned by`, PB) %>%
+  summarise(Total = n(), `Built: No`  = sum(built == "No",  na.rm = TRUE), .groups = "drop") %>%
   filter(`Built: No`  == 0)
 
-n_projects_always_no  <- nrow(projects_always_no)
-n_projects_always_yes <- nrow(projects_always_yes)
-n_projects_zero_yes   <- nrow(projects_zero_yes)
-n_projects_zero_no    <- nrow(projects_zero_no)
-n_projects            <- n_distinct(infopoints$`Planned by`)
+n_projects_always_no  = nrow(projects_always_no)
+n_projects_always_yes = nrow(projects_always_yes)
+n_projects_zero_yes   = nrow(projects_zero_yes)
+n_projects_zero_no    = nrow(projects_zero_no)
+n_projects            = n_distinct(infopoints$`Planned by`)
 ```
 
 **Zusammenfassung über alle `r n_projects` Projekte:**
@@ -1303,7 +1267,7 @@ rt(built_summary, title = "Built-Status je Projekt")
 ```{r dl-built-summary}
 download_btn(
   summary_df       = built_summary,
-  raw_df           = infopoints |> select(`External ID`, `Planned by`, built, Status),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, built, Status),
   filename_summary = "1-2-1_built_summary.csv",
   filename_raw     = "1-2-1_built_raw.csv"
 )
@@ -1312,51 +1276,49 @@ download_btn(
 **Projekte mit 100% "Built: No":**
 
 ```{r projects-always-no-table}
-projects_always_no |>
-  add_pct_cols(pct_base = "Total") |>
+projects_always_no %>%
+  add_pct_cols(pct_base = "Total") %>%
   rt(title = "Projekte mit 100% Built: No")
 ```
 
 ```{r dl-projects-always-no}
 download_btn(
   summary_df       = projects_always_no,
-  raw_df           = infopoints |>
-    filter(`Planned by` %in% projects_always_no$`Planned by`) |>
+  raw_df           = infopoints %>%
+    filter(`Planned by` %in% projects_always_no$`Planned by`) %>%
     select(`External ID`, `Planned by`, built, Status),
   filename_summary = "1-2-1-1_projects_always_no_summary.csv",
   filename_raw     = "1-2-1-1_projects_always_no_raw.csv"
 )
 ```
 
-<!-- Kommentar: Diese Projekte sollten gezielt geprüft werden -->
-
 ---
 
 #### 2.2.2 Built: Yes/No nach Status
 
 ```{r built-by-status}
-built_by_status <- infopoints |>
-  na_label() |>
-  group_by(Status) |>
+built_by_status = infopoints %>%
+  na_label() %>%
+  group_by(Status) %>%
   summarise(
     Total         = n(),
     `Built: Yes`  = sum(built == "Yes", na.rm = TRUE),
     `Built: No`   = sum(built == "No",  na.rm = TRUE),
     `Built: leer` = sum(is.na(built) | built == ""),
     .groups = "drop"
-  ) |>
-  add_col_totals() |>
+  ) %>%
+  add_col_totals() %>%
   add_pct_cols(pct_base = "Total")
 
-# statuses where Built = Yes but status is NOT receive
-highlight_built_yes_no_receive <- infopoints |>
-  na_label() |>
-  filter(built == "Yes" & Status != "receive") |>
-  pull(Status) |>
+# statuses where built = yes but status is not receive
+highlight_built_yes_no_receive = infopoints %>%
+  na_label() %>%
+  filter(built == "Yes" & Status != "receive") %>%
+  pull(Status) %>%
   unique()
 
-n_built_yes_no_receive <- infopoints |>
-  filter(built == "Yes" & (is.na(Status) | Status != "receive")) |>
+n_built_yes_no_receive = infopoints %>%
+  filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>%
   nrow()
 ```
 
@@ -1369,10 +1331,10 @@ rt(
 ```
 
 ```{r na-leer-built-highlight, results='asis'}
-n_na_leer_built <- built_by_status |>
-  filter(Status == "NA / leer") |>
+n_na_leer_built = built_by_status %>%
+  filter(Status == "NA / leer") %>%
   pull(Total)
-n_na_leer_built <- if (length(n_na_leer_built) == 0) 0 else n_na_leer_built
+n_na_leer_built = if (length(n_na_leer_built) == 0) 0 else n_na_leer_built
 
 if (n_na_leer_built > 0) {
   cat(paste0(
@@ -1389,7 +1351,7 @@ if (n_na_leer_built > 0) {
 ```{r dl-built-by-status}
 download_btn(
   summary_df       = built_by_status,
-  raw_df           = infopoints |> select(`External ID`, `Planned by`, built, Status),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, built, Status),
   filename_summary = "1-2-2_built_by_status_summary.csv",
   filename_raw     = "1-2-2_built_by_status_raw.csv"
 )
@@ -1397,7 +1359,7 @@ download_btn(
 
 ```{r built-yes-no-receive-callout, results='asis'}
 if (n_built_yes_no_receive > 0) {
-  pct_val <- round(100 * n_built_yes_no_receive / n_total, 1)
+  pct_val = round(100 * n_built_yes_no_receive / n_total, 1)
   cat(paste0(
     "
 ::: {.callout-warning}
@@ -1406,8 +1368,7 @@ if (n_built_yes_no_receive > 0) {
 ",
     "**", n_built_yes_no_receive, " Infopoints** (`", pct_val, "%` aller) ",
     "haben `Built = Yes`, aber der Status ist noch nicht auf **receive** gesetzt. ",
-    "Diese Zeilen sind in der Tabelle oben amber hervorgehoben. ",
-    "Bitte prüfen, ob die Abgeltung bereits beantragt wurde.
+    "Diese Zeilen sind in der Tabelle oben amber hervorgehoben.
 ",
     ":::
 "
@@ -1417,72 +1378,13 @@ if (n_built_yes_no_receive > 0) {
 
 ---
 
-<!--
-### 2.3 HP dahinter — Datencheck   [DISABLED 2026-07 — see note below]
-
-FLAGGED FOR REVIEW: this section's exclusion rule filters out any infopoint
-whose `Deviations` field contains the standalone word "von" (German: "of/from"),
-on the assumption that such entries don't require an "HP behind" value. This
-is a regex match on a free-text field, not a structured flag — it will
-silently miscategorize any Deviations text that happens to contain "von" for
-unrelated reasons, and will silently miss entries that mean the same thing
-but phrase it differently. Re-enable once the actual business rule (probably
-better expressed via a dedicated field/category rather than text-mining
-Deviations) is confirmed.
-
-```{r hp-dahinter-check}
-#| eval: false
-n_hp_leer <- infopoints |>
-  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "") |>
-  filter(!str_detect(str_to_lower(`Deviations`), "\\bvon\\b")) |> nrow()
-
-hp_by_project <- infopoints |>
-  group_by(`Planned by`, PB) |>
-  summarise(
-    Total          = n(),
-    `HP eingetragen`= sum(!is.na(`HP behind`) & str_trim(`HP behind`) != "" & !str_detect(str_to_lower(`Deviations`), "\\bvon\\b"), na.rm = TRUE),
-    `HP nicht relevant (von)` = sum(str_detect(str_to_lower(`Deviations`), "\\bvon\\b"), na.rm = TRUE),
-    `HP fehlt`     = sum((is.na(`HP behind`) | str_trim(`HP behind`) == "") & !str_detect(str_to_lower(`Deviations`), "\\bvon\\b"), na.rm = TRUE),
-    .groups = "drop"
-  ) |>
-  filter(`HP fehlt` > 0) |>
-  arrange(desc(`HP fehlt`)) |>
-  adorn_totals("row") |>
-  mutate(across(-c(`Planned by`, PB), as.numeric)) |>
-  mutate(`HP fehlt %` = round(100 * `HP fehlt` / Total, 1))
-```
-
-**HP-Angabe fehlt bei X Infopoints** (Zahl deaktiviert, siehe Hinweis oben). Infopoints mit "von" in den Deviations sind ausgeschlossen, da dort kein HP dahinter erforderlich ist.
-
-```{r hp-dahinter-table}
-#| eval: false
-rt(hp_by_project, title = "Fehlende HP-Angabe nach Projekt")
-```
-
-```{r dl-hp-dahinter}
-#| eval: false
-download_btn(
-  summary_df       = hp_by_project,
-  raw_df           = infopoints |>
-    filter(is.na(`HP behind`) | str_trim(`HP behind`) == "") |>
-    filter(!str_detect(str_to_lower(`Deviations`), "\\bvon\\b")) |>
-    select(`External ID`, `Planned by`, PB, Status, built, `HP behind`, Deviations),
-  filename_summary = "2-3_hp_dahinter_summary.csv",
-  filename_raw     = "2-3_hp_dahinter_raw.csv"
-)
-```
-
----
--->
-
 ## Kapitel 3: Zeitkomponente — "Applied for" & "Open"
-
 
 Dieses Kapitel analysiert, wie lange Infopoints in den Status **"applied for"** und **"open"** verbleiben — für "applied for" gemessen ab dem Datum in "Requested on", für "open" ab dem Datum in "Creation time", jeweils bis heute (`r today`).
 
 ```{r applied-for-base}
-applied_for <- infopoints |>
-  filter(Status == "applied for") |>
+applied_for = infopoints %>%
+  filter(Status == "applied for") %>%
   mutate(
     requested_on = as.Date(`Requested on`, format = "%d.%m.%Y"),
     days_open    = as.numeric(today - requested_on),
@@ -1490,13 +1392,13 @@ applied_for <- infopoints |>
     missing_date = is.na(requested_on)
   )
 
-n_applied_for      <- nrow(applied_for)
-n_missing_date     <- sum(applied_for$missing_date)
-n_with_date        <- n_applied_for - n_missing_date
-n_projects_total   <- n_distinct(infopoints$`Planned by`, na.rm = TRUE)
-n_projects_applied <- n_distinct(applied_for$`Planned by`, na.rm = TRUE)
+n_applied_for      = nrow(applied_for)
+n_missing_date     = sum(applied_for$missing_date)
+n_with_date        = n_applied_for - n_missing_date
+n_projects_total   = n_distinct(infopoints$`Planned by`, na.rm = TRUE)
+n_projects_applied = n_distinct(applied_for$`Planned by`, na.rm = TRUE)
 
-applied_for_dated <- applied_for |> filter(!missing_date)
+applied_for_dated = applied_for %>% filter(!missing_date)
 ```
 
 ### 3.1 Übersicht: "Applied for"
@@ -1521,10 +1423,8 @@ if (n_missing_date > 0) {
 
 **Projekte mit mindestens einem "applied for" Infopoint:** `r n_projects_applied` von `r n_projects_total` Projekten (`r round(100 * n_projects_applied / n_projects_total, 1)`%)
 
-Anzahl der Infopoints je Wartezeitklasse (nur Infopoints mit gültigem Datum, n = `r n_with_date`).
-
 ```{r applied-for-thresholds}
-threshold_summary <- tibble(
+threshold_summary = tibble(
   `Schwellenwert`     = c("< 4 Wochen", "4–8 Wochen", "8–12 Wochen", "> 12 Wochen"),
   `Anzahl Infopoints` = c(
     sum(applied_for_dated$weeks_open <  4),
@@ -1532,7 +1432,7 @@ threshold_summary <- tibble(
     sum(applied_for_dated$weeks_open >= 8  & applied_for_dated$weeks_open < 12),
     sum(applied_for_dated$weeks_open >= 12)
   )
-) |>
+) %>%
   mutate(`Anzahl Infopoints %` = round(100 * `Anzahl Infopoints` / n_with_date, 1))
 ```
 
@@ -1543,7 +1443,7 @@ rt(threshold_summary, title = "Offene 'Applied for' Infopoints nach Wartezeit")
 ```{r dl-thresholds}
 download_btn(
   summary_df       = threshold_summary,
-  raw_df           = applied_for_dated |>
+  raw_df           = applied_for_dated %>%
     select(`External ID`, `Planned by`, `Requested on`, requested_on, days_open, weeks_open),
   filename_summary = "2-2_applied_for_wartezeit_summary.csv",
   filename_raw     = "2-2_applied_for_wartezeit_raw.csv"
@@ -1555,8 +1455,8 @@ download_btn(
 ### 3.2 Aufschlüsselung nach Projekt
 
 ```{r applied-for-by-project}
-applied_for_by_project <- applied_for |>
-  group_by(Bau_Planung, `Planned by`, PB) |>
+applied_for_by_project = applied_for %>%
+  group_by(Bau_Planung, `Planned by`, PB) %>%
   summarise(
     `Total applied for` = n(),
     `Kein Datum`        = sum(missing_date),
@@ -1565,10 +1465,10 @@ applied_for_by_project <- applied_for |>
     `8–12 Wochen`       = sum(!missing_date & weeks_open >= 8  & weeks_open < 12),
     `> 12 Wochen`       = sum(!missing_date & weeks_open >= 12),
     .groups = "drop"
-  ) |>
-  arrange(Bau_Planung, desc(`Total applied for`)) |>
-  adorn_totals("row") |>
-  mutate(across(-c(Bau_Planung, `Planned by`, PB), as.numeric)) |>
+  ) %>%
+  arrange(Bau_Planung, desc(`Total applied for`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(-c(Bau_Planung, `Planned by`, PB), as.numeric)) %>%
   add_pct_cols(pct_base = "Total applied for")
 ```
 
@@ -1579,14 +1479,12 @@ rt(applied_for_by_project, title = "Applied for Infopoints nach Projekt und Wart
 ```{r dl-applied-for-by-project}
 download_btn(
   summary_df       = applied_for_by_project,
-  raw_df           = applied_for |>
+  raw_df           = applied_for %>%
     select(`External ID`, `Planned by`, `Requested on`, requested_on, days_open, weeks_open, missing_date),
   filename_summary = "2-3_applied_for_projekt_summary.csv",
   filename_raw     = "2-3_applied_for_projekt_raw.csv"
 )
 ```
-
-<!-- Kommentar: Projekte mit vielen lang offenen Infopoints könnten priorisiert werden -->
 
 ---
 
@@ -1597,15 +1495,10 @@ Verteilung der Wochen seit Statussetzen auf "applied for" für alle Infopoints m
 ```{r applied-for-histogram, fig.width=14, fig.height=5, out.width='100%'}
 pacman::p_load(ggplot2)
 
-max_weeks <- max(applied_for_dated$weeks_open, na.rm = TRUE)
+max_weeks = max(applied_for_dated$weeks_open, na.rm = TRUE)
 
 ggplot(applied_for_dated, aes(x = weeks_open)) +
-  geom_histogram(
-    binwidth = 4,
-    fill     = "#2c3e50",
-    color    = "white",
-    alpha    = 0.85
-  ) +
+  geom_histogram(binwidth = 4, fill = "#2c3e50", color = "white", alpha = 0.85) +
   geom_vline(xintercept = 12, color = "#e67e22", linewidth = 1, linetype = "dashed") +
   annotate("text", x = 13, y = Inf, label = "12 Wochen\nSchwelle",
            hjust = 0, vjust = 1.3, color = "#e67e22", size = 3.2) +
@@ -1621,10 +1514,10 @@ ggplot(applied_for_dated, aes(x = weeks_open)) +
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title    = element_text(face = "bold", color = "#2c3e50"),
-    plot.subtitle = element_text(color = "#666"),
+    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+    plot.subtitle    = element_text(color = "#666"),
     panel.grid.minor = element_blank(),
-    axis.text.x   = element_text(size = 9, angle = 0)
+    axis.text.x      = element_text(size = 9, angle = 0)
   )
 ```
 
@@ -1632,11 +1525,9 @@ ggplot(applied_for_dated, aes(x = weeks_open)) +
 
 ### 3.4 Übersicht: "Open"
 
-Verteilung der Wochen seit Erstellung für alle Infopoints mit Status **"open"**, gemessen ab dem Datum in "Creation time" bis heute (`r today`).
-
 ```{r open-base}
-open_ip <- infopoints |>
-  filter(str_to_lower(str_trim(Status)) == "open") |>
+open_ip = infopoints %>%
+  filter(str_to_lower(str_trim(Status)) == "open") %>%
   mutate(
     creation_date = as.Date(`Creation time`, format = "%d.%m.%Y"),
     days_open     = as.numeric(today - creation_date),
@@ -1644,10 +1535,10 @@ open_ip <- infopoints |>
     missing_date  = is.na(creation_date)
   )
 
-n_open           <- nrow(open_ip)
-n_open_missing   <- sum(open_ip$missing_date)
-n_open_with_date <- n_open - n_open_missing
-open_dated       <- open_ip |> filter(!missing_date)
+n_open           = nrow(open_ip)
+n_open_missing   = sum(open_ip$missing_date)
+n_open_with_date = n_open - n_open_missing
+open_dated       = open_ip %>% filter(!missing_date)
 ```
 
 **Gesamtanzahl Infopoints mit Status "open":** `r pct(n_open)`
@@ -1668,10 +1559,8 @@ if (n_open_missing > 0) {
 }
 ```
 
-Anzahl der Infopoints je Wartezeitklasse (nur Infopoints mit gültigem Datum, n = `r n_open_with_date`).
-
 ```{r open-thresholds}
-open_threshold_summary <- tibble(
+open_threshold_summary = tibble(
   `Schwellenwert`     = c("< 4 Wochen", "4–8 Wochen", "8–12 Wochen", "> 12 Wochen"),
   `Anzahl Infopoints` = c(
     sum(open_dated$weeks_open <  4),
@@ -1679,7 +1568,7 @@ open_threshold_summary <- tibble(
     sum(open_dated$weeks_open >= 8  & open_dated$weeks_open < 12),
     sum(open_dated$weeks_open >= 12)
   )
-) |>
+) %>%
   mutate(`Anzahl Infopoints %` = round(100 * `Anzahl Infopoints` / max(n_open_with_date, 1), 1))
 ```
 
@@ -1692,8 +1581,8 @@ rt(open_threshold_summary, title = "Offene 'Open' Infopoints nach Wartezeit")
 ### 3.5 Aufschlüsselung nach Projekt
 
 ```{r open-by-project}
-open_by_project <- open_ip |>
-  group_by(Bau_Planung, `Planned by`, PB) |>
+open_by_project = open_ip %>%
+  group_by(Bau_Planung, `Planned by`, PB) %>%
   summarise(
     `Total open`  = n(),
     `Kein Datum`  = sum(missing_date),
@@ -1702,10 +1591,10 @@ open_by_project <- open_ip |>
     `8–12 Wochen` = sum(!missing_date & weeks_open >= 8  & weeks_open < 12),
     `> 12 Wochen` = sum(!missing_date & weeks_open >= 12),
     .groups = "drop"
-  ) |>
-  arrange(Bau_Planung, desc(`Total open`)) |>
-  adorn_totals("row") |>
-  mutate(across(-c(Bau_Planung, `Planned by`, PB), as.numeric)) |>
+  ) %>%
+  arrange(Bau_Planung, desc(`Total open`)) %>%
+  adorn_totals("row") %>%
+  mutate(across(-c(Bau_Planung, `Planned by`, PB), as.numeric)) %>%
   add_pct_cols(pct_base = "Total open")
 ```
 
@@ -1716,7 +1605,7 @@ rt(open_by_project, title = "Open Infopoints nach Projekt und Wartezeit")
 ```{r dl-open-by-project}
 download_btn(
   summary_df       = open_by_project,
-  raw_df           = open_ip |>
+  raw_df           = open_ip %>%
     select(`External ID`, `Planned by`, `Creation time`, creation_date, days_open, weeks_open, missing_date),
   filename_summary = "3-5_open_projekt_summary.csv",
   filename_raw     = "3-5_open_projekt_raw.csv"
@@ -1730,15 +1619,10 @@ download_btn(
 Maximaler Wert: **`r round(max(open_dated$weeks_open, na.rm = TRUE), 1)` Wochen** (`r round(max(open_dated$days_open, na.rm = TRUE))` Tage).
 
 ```{r open-histogram, fig.width=14, fig.height=5, out.width='100%'}
-max_weeks_open <- max(open_dated$weeks_open, na.rm = TRUE)
+max_weeks_open = max(open_dated$weeks_open, na.rm = TRUE)
 
 ggplot(open_dated, aes(x = weeks_open)) +
-  geom_histogram(
-    binwidth = 4,
-    fill     = "#2c3e50",
-    color    = "white",
-    alpha    = 0.85
-  ) +
+  geom_histogram(binwidth = 4, fill = "#2c3e50", color = "white", alpha = 0.85) +
   geom_vline(xintercept = 12, color = "#e67e22", linewidth = 1, linetype = "dashed") +
   annotate("text", x = 13, y = Inf, label = "12 Wochen\nSchwelle",
            hjust = 0, vjust = 1.3, color = "#e67e22", size = 3.2) +
@@ -1754,17 +1638,17 @@ ggplot(open_dated, aes(x = weeks_open)) +
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title    = element_text(face = "bold", color = "#2c3e50"),
-    plot.subtitle = element_text(color = "#666"),
+    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+    plot.subtitle    = element_text(color = "#666"),
     panel.grid.minor = element_blank(),
-    axis.text.x   = element_text(size = 9, angle = 0)
+    axis.text.x      = element_text(size = 9, angle = 0)
   )
 ```
 
 ```{r dl-open}
 download_btn(
   summary_df       = open_threshold_summary,
-  raw_df           = open_dated |>
+  raw_df           = open_dated %>%
     select(`External ID`, `Planned by`, `Creation time`, creation_date, days_open, weeks_open),
   filename_summary = "3-6_open_wartezeit_summary.csv",
   filename_raw     = "3-6_open_wartezeit_raw.csv"
@@ -1773,97 +1657,35 @@ download_btn(
 
 ---
 
-<!--
-## Kapitel 4: Grundstücksinformationen   [DISABLED 2026-07 — temporarily removed, not deleted]
-
-### 4.1 Fehlende Parzelleninformationen nach Status
-
-```{r missing-parcel-by-status}
-#| eval: false
-missing_parcel_by_status <- infopoints |>
-  na_label() |>
-  group_by(Status) |>
-  summarise(
-    Total                    = n(),
-    `Lot number fehlt`       = sum(is.na(`Lot number`)       | `Lot number`       == ""),
-    `Folio number fehlt`     = sum(is.na(`Folio number`)     | `Folio number`     == ""),
-    `Cadastral number fehlt` = sum(is.na(`Cadastral Number`) | `Cadastral Number` == ""),
-    `Alle drei fehlen`       = sum(
-                                 (is.na(`Lot number`)       | `Lot number`       == "") &
-                                 (is.na(`Folio number`)     | `Folio number`     == "") &
-                                 (is.na(`Cadastral Number`) | `Cadastral Number` == "")
-                               ),
-    .groups = "drop"
-  ) |>
-  add_col_totals() |>
-  add_pct_cols(pct_base = "Total")
-```
-
-```{r missing-parcel-table}
-#| eval: false
-rt(missing_parcel_by_status, title = "Fehlende Parzelleninformationen nach Status")
-```
-
-```{r dl-missing-parcel}
-#| eval: false
-missing_parcel_raw <- infopoints |>
-  filter(
-    (is.na(`Lot number`)       | `Lot number`       == "") |
-    (is.na(`Folio number`)     | `Folio number`     == "") |
-    (is.na(`Cadastral Number`) | `Cadastral Number` == "")
-  ) |>
-  select(`External ID`, `Planned by`, Status, `Lot number`, `Folio number`, `Cadastral Number`)
-
-download_btn(
-  summary_df       = missing_parcel_by_status,
-  raw_df           = missing_parcel_raw,
-  filename_summary = "3-1_missing_parcel_summary.csv",
-  filename_raw     = "3-1_missing_parcel_raw.csv"
-)
-```
-
-```{r na-status-parcel-callout, results='asis'}
-#| eval: false
-na_status_callout(infopoints)
-```
-
-_Weitere Kataster-Analysen folgen in einer späteren Version._
-
-Kommentar: Hier werden die Ergebnisse aus dem Kataster-Abgleich eingefügt
-
----
--->
-
 ## Kapitel 4: Bau/Planung-Kontext
 
 Dieses Kapitel analysiert Datenqualitätsprobleme **im Kontext des Bau/Planung-Status** der jeweiligen Projekte. Issues in Projekten mit Status **"Bau fertig"** sind dringlicher als solche in Projekten, die noch in Planung sind.
 
 ```{r bauplanung-setup}
-# Bau_Planung is now on infopoints via the join
-bau_levels <- infopoints |>
-  filter(!is.na(Bau_Planung)) |>
-  pull(Bau_Planung) |>
-  unique() |>
+bau_levels = infopoints %>%
+  filter(!is.na(Bau_Planung)) %>%
+  pull(Bau_Planung) %>%
+  unique() %>%
   sort()
 ```
 
 ### 4.1 Überblick: Infopoints nach Bau/Planung-Status
 
 ```{r bauplanung-overview}
-bauplanung_overview <- infopoints |>
-  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) |>
-  group_by(Bau_Planung) |>
+bauplanung_overview = infopoints %>%
+  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) %>%
+  group_by(Bau_Planung) %>%
   summarise(
-    Total              = n(),
-    `Ohne Status`      = sum(is.na(Status) | Status == ""),
-    `Built = Yes`      = sum(built == "Yes", na.rm = TRUE),
-    `Built = No`       = sum(built == "No",  na.rm = TRUE),
-    `Payment = Yes`    = sum(`Payment required` == "Yes", na.rm = TRUE),
-    `Applied for`      = sum(Status == "applied for",  na.rm = TRUE),
-    `No response`      = sum(str_to_lower(str_trim(Status)) == "no response", na.rm = TRUE),
+    Total           = n(),
+    `Ohne Status`   = sum(is.na(Status) | Status == ""),
+    `Built = Yes`   = sum(built == "Yes", na.rm = TRUE),
+    `Built = No`    = sum(built == "No",  na.rm = TRUE),
+    `Payment = Yes` = sum(`Payment required` == "Yes", na.rm = TRUE),
+    `Applied for`   = sum(Status == "applied for",  na.rm = TRUE),
+    `No response`   = sum(str_to_lower(str_trim(Status)) == "no response", na.rm = TRUE),
     .groups = "drop"
-  ) |>
-  add_col_totals() |>
+  ) %>%
+  add_col_totals() %>%
   add_pct_cols(pct_base = "Total")
 ```
 
@@ -1874,7 +1696,7 @@ rt(bauplanung_overview, title = "Infopoints nach Bau/Planung-Status")
 ```{r dl-bauplanung-overview}
 download_btn(
   summary_df       = bauplanung_overview,
-  raw_df           = infopoints |> select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `Payment required`),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `Payment required`),
   filename_summary = "4-1_bauplanung_overview_summary.csv",
   filename_raw     = "4-1_bauplanung_overview_raw.csv"
 )
@@ -1884,21 +1706,19 @@ download_btn(
 
 ### 4.2 Kritische Issues nach Bau/Planung-Status
 
-Für jede Problemkategorie wird aufgezeigt, in welchem Bau/Planung-Status die betroffenen Infopoints liegen. Issues in weiter fortgeschrittenen Projekten ("Bau fertig") sind vorrangig zu behandeln.
-
 #### 4.2.1 Gebaut, aber Status ≠ receive — nach Bau/Planung
 
 ```{r bauplanung-built-no-receive}
-built_no_rcv_by_bp <- infopoints |>
-  filter(built == "Yes" & (is.na(Status) | Status != "receive")) |>
-  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) |>
-  group_by(Bau_Planung) |>
+built_no_rcv_by_bp = infopoints %>%
+  filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>%
+  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) %>%
+  group_by(Bau_Planung) %>%
   summarise(
-    `Anzahl`       = n(),
-    `Projekte`     = n_distinct(`Planned by`),
+    `Anzahl`   = n(),
+    `Projekte` = n_distinct(`Planned by`),
     .groups = "drop"
-  ) |>
-  arrange(desc(Anzahl)) |>
+  ) %>%
+  arrange(desc(Anzahl)) %>%
   mutate(`% von Gesamt` = round(100 * Anzahl / n_total, 1))
 ```
 
@@ -1909,8 +1729,8 @@ rt(built_no_rcv_by_bp, title = "Gebaut & Status ≠ receive: nach Bau/Planung-St
 ```{r dl-bauplanung-built-no-receive}
 download_btn(
   summary_df       = built_no_rcv_by_bp,
-  raw_df           = infopoints |>
-    filter(built == "Yes" & (is.na(Status) | Status != "receive")) |>
+  raw_df           = infopoints %>%
+    filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `Payment required`, Costs),
   filename_summary = "4-2-1_built_no_receive_bauplanung_summary.csv",
   filename_raw     = "4-2-1_built_no_receive_bauplanung_raw.csv"
@@ -1922,16 +1742,16 @@ download_btn(
 #### 4.2.2 Ohne Status-Eintrag — nach Bau/Planung
 
 ```{r bauplanung-no-status}
-no_status_by_bp <- infopoints |>
-  filter(is.na(Status) | Status == "") |>
-  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) |>
-  group_by(Bau_Planung) |>
+no_status_by_bp = infopoints %>%
+  filter(is.na(Status) | Status == "") %>%
+  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) %>%
+  group_by(Bau_Planung) %>%
   summarise(
     `Anzahl`   = n(),
     `Projekte` = n_distinct(`Planned by`),
     .groups = "drop"
-  ) |>
-  arrange(desc(Anzahl)) |>
+  ) %>%
+  arrange(desc(Anzahl)) %>%
   mutate(`% von Gesamt` = round(100 * Anzahl / n_total, 1))
 ```
 
@@ -1942,8 +1762,8 @@ rt(no_status_by_bp, title = "Ohne Status-Eintrag: nach Bau/Planung-Status")
 ```{r dl-bauplanung-no-status}
 download_btn(
   summary_df       = no_status_by_bp,
-  raw_df           = infopoints |>
-    filter(is.na(Status) | Status == "") |>
+  raw_df           = infopoints %>%
+    filter(is.na(Status) | Status == "") %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `Payment required`),
   filename_summary = "4-2-2_no_status_bauplanung_summary.csv",
   filename_raw     = "4-2-2_no_status_bauplanung_raw.csv"
@@ -1955,19 +1775,19 @@ download_btn(
 #### 4.2.3 Payment = Yes, Abgeltung nicht qualifiziert — nach Bau/Planung
 
 ```{r bauplanung-abgeltung-offen}
-abgeltung_offen_by_bp <- infopoints |>
-  filter(`Payment required` == "Yes") |>
-  filter(!(built == "Yes" & Status == "receive")) |>
-  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) |>
-  group_by(Bau_Planung) |>
+abgeltung_offen_by_bp = infopoints %>%
+  filter(`Payment required` == "Yes") %>%
+  filter(!(built == "Yes" & Status == "receive")) %>%
+  mutate(Bau_Planung = if_else(is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung)) %>%
+  group_by(Bau_Planung) %>%
   summarise(
-    `Anzahl offen`          = n(),
+    `Anzahl offen`               = n(),
     `davon gebaut, kein receive` = sum(built == "Yes" & Status != "receive", na.rm = TRUE),
-    `davon nicht gebaut`    = sum(built != "Yes", na.rm = TRUE),
-    `Projekte`              = n_distinct(`Planned by`),
+    `davon nicht gebaut`         = sum(built != "Yes", na.rm = TRUE),
+    `Projekte`                   = n_distinct(`Planned by`),
     .groups = "drop"
-  ) |>
-  arrange(desc(`Anzahl offen`)) |>
+  ) %>%
+  arrange(desc(`Anzahl offen`)) %>%
   mutate(`% von Payment=Yes` = round(100 * `Anzahl offen` / n_payment_yes, 1))
 ```
 
@@ -1978,9 +1798,9 @@ rt(abgeltung_offen_by_bp, title = "Offene Abgeltungen (nicht qualifiziert): nach
 ```{r dl-bauplanung-abgeltung-offen}
 download_btn(
   summary_df       = abgeltung_offen_by_bp,
-  raw_df           = infopoints |>
-    filter(`Payment required` == "Yes") |>
-    filter(!(built == "Yes" & Status == "receive")) |>
+  raw_df           = infopoints %>%
+    filter(`Payment required` == "Yes") %>%
+    filter(!(built == "Yes" & Status == "receive")) %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, Costs, Costs_numeric),
   filename_summary = "4-2-3_abgeltung_offen_bauplanung_summary.csv",
   filename_raw     = "4-2-3_abgeltung_offen_bauplanung_raw.csv"
@@ -1998,9 +1818,9 @@ Infopoints (`r n_total`), gefiltert auf `Built = Yes`; davon ausgeschlossen
 sind nur Infopoints mit `Status = receive`.
 
 ```{r built-no-lr-base}
-built_no_lr   <- infopoints |>
+built_no_lr   = infopoints %>%
   filter(built == "Yes" & (is.na(Status) | str_trim(Status) != "receive"))
-n_built_no_lr <- nrow(built_no_lr)
+n_built_no_lr = nrow(built_no_lr)
 ```
 
 ::: {.callout-warning}
@@ -2014,12 +1834,12 @@ aktiven) sind gebaut, haben aber noch keinen `receive`-Status.
 ### 5.1 Nach Status
 
 ```{r built-no-lr-by-status}
-built_no_lr_by_status <- built_no_lr |>
-  na_label("Status") |>
-  group_by(Status) |>
-  summarise(Total = n(), .groups = "drop") |>
-  arrange(desc(Total)) |>
-  add_col_totals() |>
+built_no_lr_by_status = built_no_lr %>%
+  na_label("Status") %>%
+  group_by(Status) %>%
+  summarise(Total = n(), .groups = "drop") %>%
+  arrange(desc(Total)) %>%
+  add_col_totals() %>%
   mutate(`% von Gesamt` = round(100 * Total / n_built_no_lr, 1))
 ```
 
@@ -2030,7 +1850,7 @@ rt(built_no_lr_by_status, title = "Gebaut ohne LR — nach Status")
 ```{r dl-built-no-lr-status}
 download_btn(
   summary_df       = built_no_lr_by_status,
-  raw_df           = built_no_lr |>
+  raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built,
            `FeederDrop Level`, `Building Type`),
   filename_summary = "6-1_built_no_lr_status_summary.csv",
@@ -2043,15 +1863,15 @@ download_btn(
 ### 5.2 Nach FeederDrop Level
 
 ```{r built-no-lr-by-feederdrop}
-built_no_lr_by_feederdrop <- built_no_lr |>
+built_no_lr_by_feederdrop = built_no_lr %>%
   mutate(`FeederDrop Level` = if_else(
     is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
     "NA / leer", `FeederDrop Level`
-  )) |>
-  group_by(`FeederDrop Level`) |>
-  summarise(Total = n(), .groups = "drop") |>
-  arrange(desc(Total)) |>
-  add_col_totals() |>
+  )) %>%
+  group_by(`FeederDrop Level`) %>%
+  summarise(Total = n(), .groups = "drop") %>%
+  arrange(desc(Total)) %>%
+  add_col_totals() %>%
   mutate(`% von Gesamt` = round(100 * Total / n_built_no_lr, 1))
 ```
 
@@ -2062,7 +1882,7 @@ rt(built_no_lr_by_feederdrop, title = "Gebaut ohne LR — nach FeederDrop Level"
 ```{r dl-built-no-lr-feederdrop}
 download_btn(
   summary_df       = built_no_lr_by_feederdrop,
-  raw_df           = built_no_lr |>
+  raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
   filename_summary = "6-2_built_no_lr_feederdrop_summary.csv",
   filename_raw     = "6-2_built_no_lr_feederdrop_raw.csv"
@@ -2073,21 +1893,19 @@ download_btn(
 
 ### 5.3 Nach Bau/Planung-Phase
 
-Issues in weiter fortgeschrittenen Projekten ("Bau fertig") sind vorrangig zu behandeln.
-
 ```{r built-no-lr-by-bauplanung}
-built_no_lr_by_bauplanung <- built_no_lr |>
+built_no_lr_by_bauplanung = built_no_lr %>%
   mutate(Bau_Planung = if_else(
     is.na(Bau_Planung) | Bau_Planung == "", "NA / leer", Bau_Planung
-  )) |>
-  group_by(Bau_Planung) |>
+  )) %>%
+  group_by(Bau_Planung) %>%
   summarise(
     Total    = n(),
     Projekte = n_distinct(`Planned by`),
     .groups  = "drop"
-  ) |>
-  arrange(desc(Total)) |>
-  add_col_totals() |>
+  ) %>%
+  arrange(desc(Total)) %>%
+  add_col_totals() %>%
   mutate(`% von Gesamt` = round(100 * Total / n_built_no_lr, 1))
 ```
 
@@ -2098,7 +1916,7 @@ rt(built_no_lr_by_bauplanung, title = "Gebaut ohne LR — nach Bau/Planung-Phase
 ```{r dl-built-no-lr-bauplanung}
 download_btn(
   summary_df       = built_no_lr_by_bauplanung,
-  raw_df           = built_no_lr |>
+  raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
   filename_summary = "6-3_built_no_lr_bauplanung_summary.csv",
   filename_raw     = "6-3_built_no_lr_bauplanung_raw.csv"
@@ -2110,19 +1928,19 @@ download_btn(
 ### 5.4 Kreuztabelle: Status × FeederDrop Level
 
 ```{r built-no-lr-crosstab}
-built_no_lr_crosstab <- built_no_lr |>
-  na_label("Status") |>
+built_no_lr_crosstab = built_no_lr %>%
+  na_label("Status") %>%
   mutate(`FeederDrop Level` = if_else(
     is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
     "NA / leer", `FeederDrop Level`
-  )) |>
-  group_by(Status, `FeederDrop Level`) |>
-  summarise(n = n(), .groups = "drop") |>
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) |>
-  add_col_totals() |>
-  mutate(Total = rowSums(across(where(is.numeric)))) |>
-  relocate(Total, .after = Status) |>
-  add_pct_cols(pct_base = "Total") |>
+  )) %>%
+  group_by(Status, `FeederDrop Level`) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
+  add_col_totals() %>%
+  mutate(Total = rowSums(across(where(is.numeric)))) %>%
+  relocate(Total, .after = Status) %>%
+  add_pct_cols(pct_base = "Total") %>%
   arrange(desc(Total))
 ```
 
@@ -2133,7 +1951,7 @@ rt(built_no_lr_crosstab, title = "Gebaut ohne LR — Status × FeederDrop Level"
 ```{r dl-built-no-lr-crosstab}
 download_btn(
   summary_df       = built_no_lr_crosstab,
-  raw_df           = built_no_lr |>
+  raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
   filename_summary = "6-4_built_no_lr_crosstab_summary.csv",
   filename_raw     = "6-4_built_no_lr_crosstab_raw.csv"
@@ -2145,23 +1963,23 @@ download_btn(
 ### 5.5 Aufschlüsselung nach Projekt
 
 ```{r built-no-lr-by-project}
-built_no_lr_by_project <- built_no_lr |>
+built_no_lr_by_project = built_no_lr %>%
   mutate(`FeederDrop Level` = if_else(
     is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
     "NA / leer", `FeederDrop Level`
-  )) |>
-  group_by(`Planned by`, PB, Bau_Planung, `FeederDrop Level`) |>
-  summarise(n = n(), .groups = "drop") |>
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) |>
+  )) %>%
+  group_by(`Planned by`, PB, Bau_Planung, `FeederDrop Level`) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
   mutate(
     `Drop Level`   = if ("Drop Level"   %in% names(pick(everything()))) `Drop Level`   else 0L,
     `Feeder Level` = if ("Feeder Level" %in% names(pick(everything()))) `Feeder Level` else 0L,
     `NA / leer`    = if ("NA / leer"    %in% names(pick(everything()))) `NA / leer`    else 0L
-  ) |>
-  mutate(Total = rowSums(across(where(is.numeric)))) |>
-  arrange(desc(Total)) |>
-  adorn_totals("row") |>
-  mutate(across(where(is.numeric), as.numeric)) |>
+  ) %>%
+  mutate(Total = rowSums(across(where(is.numeric)))) %>%
+  arrange(desc(Total)) %>%
+  adorn_totals("row") %>%
+  mutate(across(where(is.numeric), as.numeric)) %>%
   mutate(`% von Gesamt` = round(100 * Total / n_built_no_lr, 1))
 ```
 
@@ -2172,7 +1990,7 @@ rt(built_no_lr_by_project, title = "Gebaut ohne LR — nach Projekt und FeederDr
 ```{r dl-built-no-lr-project}
 download_btn(
   summary_df       = built_no_lr_by_project,
-  raw_df           = built_no_lr |>
+  raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
   filename_summary = "6-5_built_no_lr_project_summary.csv",
   filename_raw     = "6-5_built_no_lr_project_raw.csv"
@@ -2180,108 +1998,6 @@ download_btn(
 ```
 
 ---
-
-<!--
-### 5.6 Trassenlänge ohne Leitungsrecht   [DISABLED 2026-07 — see note below]
-
-FLAGGED FOR REVIEW: this section relies on `length_without_permission_m` from
-the enrichment file (preprocessing.R). It's unconfirmed whether that file has
-exactly one row per infopoint (External ID) or can have multiple trasse rows
-per infopoint. If it's 1:many, the left_join in the setup chunk fans out rows
-and every downstream sum/mean/histogram here silently double-counts meters —
-the original code's own callout-note ("Meter × Infopoints, not unique
-Trassenmeter") already acknowledged the sum is questionable. Re-enable this
-section, and the four commented-out columns in the enrichment join in the
-`setup` chunk, once the aggregation grain of preprocessing.R is confirmed.
-
-Gebaut-ohne-LR-Infopoints mit räumlich berechnetem Trassenmeter-Wert aus
-`preprocessing.R` (`length_without_permission_m`). Infopoints ohne Katasterdaten
-oder ohne API-Treffer haben keinen Wert und sind ausgeschlossen.
-
-::: {.callout-note}
-Der Summenwert in der Kennzahlen-Tabelle repräsentiert **Meter × Infopoints**, nicht
-eindeutige Trassenmetrer — Infopoints auf derselben Parzelle teilen denselben
-Längenwert. Histogramm, Median und Max sind davon nicht betroffen.
-:::
-
-```{r built-no-lr-metres-base}
-#| eval: false
-blr_metres           <- built_no_lr |> filter(!is.na(length_without_permission_m))
-n_blr_metres         <- nrow(blr_metres)
-n_blr_metres_missing <- n_built_no_lr - n_blr_metres
-```
-
-```{r built-no-lr-metres-coverage, results='asis'}
-#| eval: false
-if (n_blr_metres_missing > 0) {
-  cat(paste0(
-    "\n::: {.callout-warning}\n## ⚠️ Fehlende Trassenlängen\n",
-    "**", n_blr_metres_missing, " von ", n_built_no_lr, " Infopoints** haben keinen ",
-    "`length_without_permission_m`-Wert — entweder fehlen die Katasterdaten (KG/GNR/EZ leer) ",
-    "oder die Parzelle wurde in der BEV API nicht gefunden. ",
-    "Die folgende Auswertung basiert auf **", n_blr_metres, " Infopoints** mit gültigem Wert.\n",
-    ":::\n"
-  ))
-}
-```
-
-```{r built-no-lr-metres-summary}
-#| eval: false
-blr_m_summary <- tibble(
-  Kennzahl = c("Infopoints mit Wert", "Summe (m)", "Median (m)", "Mittelwert (m)", "Max (m)", "Min > 0 (m)"),
-  Wert = c(
-    n_blr_metres,
-    round(sum(blr_metres$length_without_permission_m,    na.rm = TRUE)),
-    round(median(blr_metres$length_without_permission_m, na.rm = TRUE)),
-    round(mean(blr_metres$length_without_permission_m,   na.rm = TRUE)),
-    round(max(blr_metres$length_without_permission_m,    na.rm = TRUE)),
-    round(min(blr_metres$length_without_permission_m[
-                blr_metres$length_without_permission_m > 0], na.rm = TRUE))
-  )
-)
-```
-
-```{r built-no-lr-metres-summary-table}
-#| eval: false
-rt(blr_m_summary, title = "Trassenlänge ohne LR — Kennzahlen")
-```
-
-```{r built-no-lr-metres-histogram, fig.width=14, fig.height=5, out.width='100%'}
-#| eval: false
-max_m <- max(blr_metres$length_without_permission_m, na.rm = TRUE)
-
-ggplot(blr_metres, aes(x = length_without_permission_m)) +
-  geom_histogram(binwidth = 50, fill = "#2c3e50", color = "white", alpha = 0.85) +
-  scale_x_continuous(
-    breaks = seq(0, ceiling(max_m / 100) * 100, by = 100),
-    labels = function(x) paste0(x, " m")
-  ) +
-  labs(
-    title    = paste0("Trassenlänge ohne Leitungsrecht (max: ", round(max_m), " m)"),
-    subtitle = paste0("n = ", n_blr_metres, " Infopoints mit gültigem Wert | Balkenbreite = 50 m"),
-    x        = "Trassenlänge (m)",
-    y        = "Anzahl Infopoints"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title       = element_text(face = "bold", color = "#2c3e50"),
-    plot.subtitle    = element_text(color = "#666"),
-    panel.grid.minor = element_blank()
-  )
-```
-
-```{r dl-built-no-lr-metres}
-#| eval: false
-download_btn(
-  summary_df       = blr_m_summary,
-  raw_df           = blr_metres |>
-    select(`External ID`, `Planned by`, PB, Bau_Planung, Status,
-           `FeederDrop Level`, trasse_length_m, length_without_permission_m),
-  filename_summary = "6-6_built_no_lr_metres_summary.csv",
-  filename_raw     = "6-6_built_no_lr_metres_raw.csv"
-)
-```
--->
 
 ## Kapitel 6: LR im Zeitverlauf
 
@@ -2291,26 +2007,26 @@ auf der Zusammenfassung in `LR-Statusentwicklung_piha_neu.xlsx`
 Projekte bereinigt (siehe Titel des Tabellenblatts).
 
 ```{r lr-status-history-load}
-lr_status_history_raw <- read_excel(
+lr_status_history_raw = read_excel(
   lr_status_history_path,
   sheet     = "Statusentwicklung",
   skip      = 1,
   col_names = TRUE
 )
 
-# Standardize column names by position — confirmed order: Datum, abgelehnt,
+# standardize column names by position — confirmed order: datum, abgelehnt,
 # angesucht, erhalten, offen, storniert, no response.
-names(lr_status_history_raw)[1:7] <- c(
+names(lr_status_history_raw)[1:7] = c(
   "kw", "Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"
 )
 
-lr_status_history <- lr_status_history_raw |>
-  filter(!is.na(kw) & kw != "") |>
+lr_status_history = lr_status_history_raw %>%
+  filter(!is.na(kw) & kw != "") %>%
   mutate(across(c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response),
-                ~ suppressWarnings(as.numeric(.x)))) |>
+                ~ suppressWarnings(as.numeric(.x)))) %>%
   mutate(kw_order = row_number())
 
-n_lr_weeks <- nrow(lr_status_history)
+n_lr_weeks = nrow(lr_status_history)
 ```
 
 ::: {.callout-note}
@@ -2323,12 +2039,12 @@ Aufschlüsselung nach einzelnem Projekt in dieser Quelle verfügbar.
 ### 6.1 Entwicklung nach Status
 
 ```{r lr-status-history-chart, fig.width=14, fig.height=7, out.width='100%'}
-lr_status_long <- lr_status_history |>
+lr_status_long = lr_status_history %>%
   pivot_longer(
     cols      = c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response),
     names_to  = "Status",
     values_to = "Anzahl"
-  ) |>
+  ) %>%
   mutate(
     Status = factor(Status,
       levels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"),
@@ -2337,7 +2053,7 @@ lr_status_long <- lr_status_history |>
     kw = factor(kw, levels = lr_status_history$kw)
   )
 
-status_colors <- c(
+status_colors = c(
   "Abgelehnt"   = "#c0392b",
   "Angesucht"   = "#e67e22",
   "Erhalten"    = "#18bc9c",
@@ -2346,7 +2062,7 @@ status_colors <- c(
   "No Response" = "#8e44ad"
 )
 
-lr_status_gg <- ggplot(
+lr_status_gg = ggplot(
     lr_status_long,
     aes(x = kw, y = Anzahl, color = Status, group = Status,
         text = paste0(Status, ", ", kw, ": ", Anzahl))
@@ -2362,13 +2078,13 @@ lr_status_gg <- ggplot(
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title      = element_text(face = "bold", color = "#2c3e50"),
-    axis.text.x     = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 9),
     panel.grid.minor = element_blank(),
-    legend.position = "bottom"
+    legend.position  = "bottom"
   )
 
-ggplotly(lr_status_gg, tooltip = "text") |>
+ggplotly(lr_status_gg, tooltip = "text") %>%
   layout(legend = list(orientation = "h", y = -0.25))
 ```
 
@@ -2377,7 +2093,7 @@ ggplotly(lr_status_gg, tooltip = "text") |>
 ### 6.2 Rohdaten
 
 ```{r lr-status-history-table}
-lr_status_history_display <- lr_status_history |>
+lr_status_history_display = lr_status_history %>%
   select(kw, Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response)
 
 rt(lr_status_history_display, title = "LR-Statusentwicklung je Kalenderwoche")
@@ -2401,158 +2117,155 @@ Projekt zu sehen: Status-Verteilung, FeederDrop Level, Built-Status und die
 Zeitkomponente (applied for / open).
 
 ```{r project-pages-prep}
-# -------------------------------------------------------------------------
-# All five metric views collapsed into tidy long-format tables, one row per
-# (Planned by, category, count). The ojs side only filters by project and
-# renders — no aggregation logic lives in JS.
+# all five metric views collapsed into tidy long-format tables, one row per
+# (planned by, category, count). the ojs side only filters by project and
+# renders — no aggregation logic lives in js.
 #
-# Alongside each, a matching *_detail table keeps the individual infopoint
+# alongside each, a matching *_detail table keeps the individual infopoint
 # rows (not just counts) so a per-row download button can export exactly
 # the infopoints behind that number.
-# -------------------------------------------------------------------------
-# ── helper: add baulos_name to any detail table ───────────────────────────
-# Left join so infopoints without a Baulos match keep all their rows (baulos_name = NA)
-add_baulos <- function(df) {
-  df |> left_join(baulos_lookup |> select(`External ID`, baulos_name),
-                  by = "External ID")
+
+# helper: add baulos_name to any detail table
+# left join so infopoints without a baulos match keep all their rows (baulos_name = NA)
+add_baulos = function(df) {
+  df %>% left_join(baulos_lookup %>% select(`External ID`, baulos_name), by = "External ID")
 }
 
-detail_cols <- c("External ID", "Planned by", "Status", "FeederDrop Level", "built", "HP behind")
+detail_cols = c("External ID", "Planned by", "Status", "FeederDrop Level", "built", "HP behind")
 
-pp_status <- infopoints |>
-  na_label("Status") |>
-  count(`Planned by`, Status, name = "n") |>
+pp_status = infopoints %>%
+  na_label("Status") %>%
+  count(`Planned by`, Status, name = "n") %>%
   rename(category = Status)
 
-pp_status_detail <- infopoints |>
-  na_label("Status") |>
-  select(all_of(detail_cols)) |>
-  mutate(category = Status) |>
+pp_status_detail = infopoints %>%
+  na_label("Status") %>%
+  select(all_of(detail_cols)) %>%
+  mutate(category = Status) %>%
   add_baulos()
 
-pp_feederdrop <- infopoints |>
+pp_feederdrop = infopoints %>%
   mutate(`FeederDrop Level` = if_else(
     is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
     "NA / leer", `FeederDrop Level`
-  )) |>
-  count(`Planned by`, `FeederDrop Level`, name = "n") |>
+  )) %>%
+  count(`Planned by`, `FeederDrop Level`, name = "n") %>%
   rename(category = `FeederDrop Level`)
 
-pp_feederdrop_detail <- infopoints |>
+pp_feederdrop_detail = infopoints %>%
   mutate(`FeederDrop Level` = if_else(
     is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
     "NA / leer", `FeederDrop Level`
-  )) |>
-  select(all_of(detail_cols)) |>
-  mutate(category = `FeederDrop Level`) |>
+  )) %>%
+  select(all_of(detail_cols)) %>%
+  mutate(category = `FeederDrop Level`) %>%
   add_baulos()
 
-pp_built <- infopoints |>
-  mutate(built = if_else(is.na(built) | built == "", "NA / leer", built)) |>
-  count(`Planned by`, built, name = "n") |>
+pp_built = infopoints %>%
+  mutate(built = if_else(is.na(built) | built == "", "NA / leer", built)) %>%
+  count(`Planned by`, built, name = "n") %>%
   rename(category = built)
 
-pp_built_detail <- infopoints |>
-  mutate(built = if_else(is.na(built) | built == "", "NA / leer", built)) |>
-  select(all_of(detail_cols)) |>
-  mutate(category = built) |>
+pp_built_detail = infopoints %>%
+  mutate(built = if_else(is.na(built) | built == "", "NA / leer", built)) %>%
+  select(all_of(detail_cols)) %>%
+  mutate(category = built) %>%
   add_baulos()
 
-pp_applied_for <- applied_for |>
+pp_applied_for = applied_for %>%
   mutate(
     bucket = case_when(
-      missing_date         ~ "Kein Datum",
+      missing_date          ~ "Kein Datum",
       weeks_open <  4       ~ "< 4 Wochen",
       weeks_open <  8       ~ "4–8 Wochen",
       weeks_open < 12       ~ "8–12 Wochen",
       TRUE                  ~ "> 12 Wochen"
     )
-  ) |>
-  count(`Planned by`, bucket, name = "n") |>
+  ) %>%
+  count(`Planned by`, bucket, name = "n") %>%
   rename(category = bucket)
 
-pp_applied_for_detail <- applied_for |>
+pp_applied_for_detail = applied_for %>%
   mutate(
     category = case_when(
-      missing_date         ~ "Kein Datum",
+      missing_date          ~ "Kein Datum",
       weeks_open <  4       ~ "< 4 Wochen",
       weeks_open <  8       ~ "4–8 Wochen",
       weeks_open < 12       ~ "8–12 Wochen",
       TRUE                  ~ "> 12 Wochen"
     )
-  ) |>
-  select(`External ID`, `Planned by`, Status, `Requested on`, weeks_open, category) |>
+  ) %>%
+  select(`External ID`, `Planned by`, Status, `Requested on`, weeks_open, category) %>%
   add_baulos()
 
-pp_open <- open_ip |>
+pp_open = open_ip %>%
   mutate(
     bucket = case_when(
-      missing_date         ~ "Kein Datum",
+      missing_date          ~ "Kein Datum",
       weeks_open <  4       ~ "< 4 Wochen",
       weeks_open <  8       ~ "4–8 Wochen",
       weeks_open < 12       ~ "8–12 Wochen",
       TRUE                  ~ "> 12 Wochen"
     )
-  ) |>
-  count(`Planned by`, bucket, name = "n") |>
+  ) %>%
+  count(`Planned by`, bucket, name = "n") %>%
   rename(category = bucket)
 
-pp_open_detail <- open_ip |>
+pp_open_detail = open_ip %>%
   mutate(
     category = case_when(
-      missing_date         ~ "Kein Datum",
+      missing_date          ~ "Kein Datum",
       weeks_open <  4       ~ "< 4 Wochen",
       weeks_open <  8       ~ "4–8 Wochen",
       weeks_open < 12       ~ "8–12 Wochen",
       TRUE                  ~ "> 12 Wochen"
     )
-  ) |>
-  select(`External ID`, `Planned by`, Status, `Creation time`, weeks_open, category) |>
+  ) %>%
+  select(`External ID`, `Planned by`, Status, `Creation time`, weeks_open, category) %>%
   add_baulos()
 
-# Same filter logic as the Executive Summary's "Feeder gebaut ohne LR" KPI,
-# broken down per project. One row per project — count only, no categories.
-pp_feeder_built_no_lr <- infopoints |>
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") |>
+# same filter logic as the executive summary's "feeder gebaut ohne lr" kpi,
+# broken down per project. one row per project — count only, no categories.
+pp_feeder_built_no_lr = infopoints %>%
+  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
   count(`Planned by`, name = "n")
 
-pp_feeder_built_no_lr_detail <- infopoints |>
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") |>
-  select(all_of(detail_cols)) |>
-  mutate(category = "Feeder gebaut ohne LR") |>
+pp_feeder_built_no_lr_detail = infopoints %>%
+  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
+  select(all_of(detail_cols)) %>%
+  mutate(category = "Feeder gebaut ohne LR") %>%
   add_baulos()
 
-# HP behind missing: NA, empty, or literal "0"
-pp_hp_missing <- infopoints |>
-  na_label("Status") |>
-  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "" | str_trim(`HP behind`) == "0") |>
-  count(`Planned by`, Status, name = "n") |>
+# hp behind missing: NA, empty, or literal "0"
+pp_hp_missing = infopoints %>%
+  na_label("Status") %>%
+  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "" | str_trim(`HP behind`) == "0") %>%
+  count(`Planned by`, Status, name = "n") %>%
   rename(category = Status)
 
-pp_hp_missing_detail <- infopoints |>
-  na_label("Status") |>
-  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "" | str_trim(`HP behind`) == "0") |>
-  select(all_of(detail_cols)) |>
-  mutate(category = Status) |>
+pp_hp_missing_detail = infopoints %>%
+  na_label("Status") %>%
+  filter(is.na(`HP behind`) | str_trim(`HP behind`) == "" | str_trim(`HP behind`) == "0") %>%
+  select(all_of(detail_cols)) %>%
+  mutate(category = Status) %>%
   add_baulos()
 
-pp_projects <- infopoints |>
-  distinct(`Planned by`) |>
-  filter(!is.na(`Planned by`)) |>
-  arrange(`Planned by`) |>
+pp_projects = infopoints %>%
+  distinct(`Planned by`) %>%
+  filter(!is.na(`Planned by`)) %>%
+  arrange(`Planned by`) %>%
   pull(`Planned by`)
 
-# Info box: one row per project with PCM, Bau_Planung, ende_bau_passiv_plan
-pp_info <- infopoints |>
-  distinct(`Planned by`, PCM, Bau_Planung, ende_bau_passiv_plan) |>
+# info box: one row per project with pcm, bau_planung, ende_bau_passiv_plan
+pp_info = infopoints %>%
+  distinct(`Planned by`, PCM, Bau_Planung, ende_bau_passiv_plan) %>%
   filter(!is.na(`Planned by`))
 
-# FttX Locations summary per project:
-# Rows: fixed Scoping categories (In Scope, Outside Build Scope, Non Connectable, NA/leer)
-# Columns per row: Scoping, n (count of addresses), sum_tu (sum of Planned TU)
-# baulos_name included for Baulos filter in JS
-pp_fttx <- fttx |>
-  group_by(`Planned by`, Scoping, baulos_name) |>
+# fttx locations summary per project:
+# rows: fixed scoping categories
+# columns per row: scoping, n (count of addresses), sum_tu (sum of planned tu)
+pp_fttx = fttx %>%
+  group_by(`Planned by`, Scoping, baulos_name) %>%
   summarise(
     n      = n(),
     sum_tu = sum(`Planned TU`, na.rm = TRUE),
@@ -2563,12 +2276,12 @@ pp_fttx <- fttx |>
 ```{r project-pages-json}
 #| echo: false
 #| results: asis
-ch7_data <- list(
+ch7_data = list(
   exportDate          = infopoints_export_date,
   projects            = pp_projects,
   info                = pp_info,
   baulos_by_project   = pp_baulos_by_project,
-  pcm_list            = pp_info |> distinct(PCM, `Planned by`) |> filter(!is.na(PCM)) |> arrange(PCM),
+  pcm_list            = pp_info %>% distinct(PCM, `Planned by`) %>% filter(!is.na(PCM)) %>% arrange(PCM),
   status              = pp_status,
   status_detail       = pp_status_detail,
   feederdrop          = pp_feederdrop,
@@ -2586,10 +2299,9 @@ ch7_data <- list(
   fttx                = pp_fttx,
   fttx_scoping_levels = SCOPING_LEVELS
 )
-json_str <- jsonlite::toJSON(ch7_data, auto_unbox = TRUE, na = "null")
+json_str = jsonlite::toJSON(ch7_data, auto_unbox = TRUE, na = "null")
 cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', json_str))
 ```
-
 
 ```{=html}
 <style>
@@ -2645,7 +2357,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-card.fttx-card .ch7-tbl tfoot tr{background:#8a7560}
 .ch7-tbl tfoot td{padding:7px 11px;color:white;font-weight:700;font-size:.86em}
 .ch7-tbl tfoot td.r{text-align:right}
-/* Pin column widths so tfoot aligns with thead/tbody under flex layout */
 .ch7-tbl thead th:first-child,.ch7-tbl tbody td:first-child,.ch7-tbl tfoot td:first-child{width:50%}
 .ch7-tbl thead th:nth-child(2),.ch7-tbl tbody td:nth-child(2),.ch7-tbl tfoot td:nth-child(2){width:22%}
 .ch7-tbl thead th:nth-child(3),.ch7-tbl tbody td:nth-child(3),.ch7-tbl tfoot td:nth-child(3){width:16%}
@@ -2666,8 +2377,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 
 <div id="ch7">
   <div class="ch7-filters-row">
-
-    <!-- Col 1: Project search -->
     <div class="ch7-filter-col">
       <label class="ch7-sel-label">Projekt suchen</label>
       <input class="ch7-search" id="ch7s" type="text" placeholder="Projekt suchen…">
@@ -2675,15 +2384,12 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       <div class="ch7-proj-list" id="ch7l"></div>
       <div style="font-size:.78em;color:#999;margin-top:3px">Klicken zum Auswählen</div>
     </div>
-
-    <!-- Col 2: Baulos + FeederDrop stacked -->
     <div class="ch7-filter-col">
       <label class="ch7-sel-label">Baulos</label>
       <select class="ch7-filter-select" id="ch7bl" disabled>
         <option value="">— kein Baulos ausgewählt —</option>
       </select>
       <button class="ch7-clear-btn" id="ch7blc" onclick="ch7ClearBaulos()">✕ Baulos zurücksetzen</button>
-
       <label class="ch7-sel-label" style="margin-top:14px">FeederDrop Level</label>
       <div class="ch7-fd-list">
         <label class="ch7-fd-item"><input type="checkbox" id="ch7fd0" value="Drop Level"> Drop Level</label>
@@ -2692,8 +2398,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       </div>
       <button class="ch7-clear-btn" id="ch7fdclear" onclick="ch7ClearFD()">✕ FeederDrop zurücksetzen</button>
     </div>
-
-    <!-- Col 3: PCM -->
     <div class="ch7-filter-col">
       <label class="ch7-sel-label">PCM</label>
       <input class="ch7-search" id="ch7pcms" type="text" placeholder="PCM suchen…">
@@ -2701,7 +2405,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       <div class="ch7-proj-list" id="ch7pcml"></div>
       <button class="ch7-clear-btn" id="ch7pcmclear" onclick="ch7ClearPCM()">✕ PCM zurücksetzen</button>
     </div>
-
   </div>
 
   <div class="ch7-tags" id="ch7t"></div>
@@ -2741,9 +2444,8 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
   let selected  = [];
   let selBaulos = "";
   let selPCM    = "";
-  let selFD     = [];  // selected FeederDrop levels ([] = show all)
+  let selFD     = [];
 
-  /* ── FeederDrop filter ───────────────────────────────────────────────── */
   const FD_IDS = ["ch7fd0","ch7fd1","ch7fd2"];
   FD_IDS.forEach(id => {
     document.getElementById(id).addEventListener("change", () => {
@@ -2759,7 +2461,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     renderCards();
   };
 
-  /* ── PCM list ────────────────────────────────────────────────────────── */
   function buildPCMList(filter) {
     filter = (filter || "").toLowerCase();
     const allPCMs = [...new Set(DATA.pcm_list.map(r => r.PCM))].sort();
@@ -2794,7 +2495,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     buildPCMList(); buildList(document.getElementById("ch7s").value);
   };
 
-  /* ── Project list ────────────────────────────────────────────────────── */
   function buildList(filter) {
     filter = (filter || "").toLowerCase();
     const pp = selPCM ? new Set(DATA.pcm_list.filter(r => r.PCM === selPCM).map(r => r["Planned by"])) : null;
@@ -2817,7 +2517,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
   }
   document.getElementById("ch7s").addEventListener("input", e => buildList(e.target.value));
 
-  /* ── Baulos dropdown ─────────────────────────────────────────────────── */
   function buildBaulosList() {
     const sel = document.getElementById("ch7bl");
     const btn = document.getElementById("ch7blc");
@@ -2850,7 +2549,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     document.getElementById("ch7blc").style.display = "none"; renderCards();
   };
 
-  /* ── Tags ────────────────────────────────────────────────────────────── */
   function renderTags() {
     const w = document.getElementById("ch7t"); w.innerHTML = "";
     selected.forEach(p => {
@@ -2865,7 +2563,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     });
   }
 
-  /* ── CSV helpers ─────────────────────────────────────────────────────── */
   function dlCSV(rows, filename) {
     if (!rows || !rows.length) return;
     const cols = Object.keys(rows[0]);
@@ -2883,19 +2580,13 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     return safeP + safeBl + safeFD + "_" + DATA.exportDate;
   }
 
-  /* ── Aggregation ─────────────────────────────────────────────────────── */
-  // Apply FeederDrop filter to detail rows
   function applyFD(rows) {
     return selFD.length ? rows.filter(r => selFD.includes(r["FeederDrop Level"])) : rows;
   }
 
-  // Returns [{cat, nTotal, nBaulos}]
-  // nTotal = full project count (optionally FD-filtered), always the denominator
-  // nBaulos = Baulos-filtered count (null when no Baulos selected)
   function sumCats(aggArr, detailArr, catField) {
     let mTot = new Map();
     if (selFD.length) {
-      // Re-count from detail when FD filter active
       applyFD(detailArr.filter(r => selected.includes(r["Planned by"]))).forEach(r => {
         const k = r.category || "";
         mTot.set(k, (mTot.get(k) || 0) + 1);
@@ -2919,19 +2610,14 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     })).sort((a,b) => b.nTotal - a.nTotal);
   }
 
-
-
-  /* ── Table builder ───────────────────────────────────────────────────── */
   const ALL_FD = ["Drop Level","Feeder Level","NA / leer"];
 
   function buildTable(aggRows, detailArr, colLabel, prefix, order) {
-    // For ordered tables, always show all expected rows with 0 if missing
     if (order) {
       const m = new Map(aggRows.map(r => [r.cat, r]));
       const hasBl = selBaulos ? true : false;
       aggRows = order.map(o => m.get(o) || {cat:o, nTotal:0, nBaulos: hasBl ? 0 : null});
     }
-    // FeederDrop card: always show all three values including NA/leer
     if (colLabel === "Level") {
       const m = new Map(aggRows.map(r => [r.cat, r]));
       const hasBl = selBaulos ? true : false;
@@ -2975,7 +2661,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
         : row.nTotal.toLocaleString("de");
 
       const tr = document.createElement("tr");
-      // NA/leer: grey if 0, red if > 0
       if (isNA && isZero)     tr.className = "na-grey";
       else if (isNA)          tr.className = "na-red";
 
@@ -2983,9 +2668,8 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
         "</td><td class='p'>"+pct+"</td><td style='text-align:center;width:34px;'>"+
         "<button class='ch7-dl' title='Rohdaten herunterladen'>\u2b07</button></td>";
       tr.querySelector(".ch7-dl").onclick = () => {
-        // Filter detail rows for this category + active filters
         const rows = applyFD(detailArr.filter(r =>
-          selected.includes(r["Planned by"]) && r.category === cat &&
+          selected.includes(r["Planned by"]) && r.category === row.cat &&
           (!selBaulos || r.baulos_name === selBaulos)
         )).map(r => { const o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
         dlCSV(rows, prefix+"_"+safe(row.cat)+"_"+fileSuffix()+".csv");
@@ -2996,7 +2680,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     return tbl;
   }
 
-  /* ── Card definitions ────────────────────────────────────────────────── */
   const WAIT = ["< 4 Wochen","4\u20138 Wochen","8\u201312 Wochen","> 12 Wochen","Kein Datum"];
   const ALL_STATUSES = ["open","applied for","receive","rejected","no response","NA / leer"];
 
@@ -3062,22 +2745,18 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       }, detail:null, order:null }
   ];
 
-  /* ── FttX table builder (Scoping | Anzahl | Sum TU, no %) ───────────── */
   function buildFttxTable(aggRows) {
     const totalN  = aggRows.reduce((s,r) => s + r.n,      0);
     const totalTU = aggRows.reduce((s,r) => s + r.sum_tu, 0);
-
     const sorted = [
       ...aggRows.filter(r => r.cat === "NA / leer"),
       ...aggRows.filter(r => r.cat !== "NA / leer")
     ];
-
     const tbl = document.createElement("table"); tbl.className="ch7-tbl";
     tbl.innerHTML =
       "<thead><tr><th>Scoping</th><th class='r'>Adressen</th><th class='r'>Sum TU</th></tr></thead>" +
       "<tfoot><tr><td>Total</td><td class='r'>"+totalN.toLocaleString("de")+
       "</td><td class='r'>"+Math.round(totalTU).toLocaleString("de")+"</td></tr></tfoot>";
-
     const tb = document.createElement("tbody");
     sorted.forEach(row => {
       const isNA   = row.cat === "NA / leer";
@@ -3094,7 +2773,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     return tbl;
   }
 
-  /* ── Render ──────────────────────────────────────────────────────────── */
   function renderCards() {
     const grid = document.getElementById("ch7g");
     const wait = document.getElementById("ch7w");
@@ -3107,22 +2785,17 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     }
     wait.style.display="none"; grid.style.display="grid";
 
-    // Banner
     const parts = [];
     if (selBaulos) parts.push("Baulos: \u201e"+selBaulos+"\u201c");
     if (selFD.length) parts.push("FeederDrop: "+selFD.join(", "));
     bnr.style.display = parts.length ? "block" : "none";
     if (parts.length) bnr.textContent = "\u2139\ufe0f  Filter aktiv \u2014 "+parts.join(" | ")+(selBaulos?" \u2014 Anzahl zeigt Baulos\u00a0/\u00a0Gesamt":"");
 
-    // Info box
     iw.style.display = "block"; iw.innerHTML = "";
     const infoCard = document.createElement("div"); infoCard.className="ch7-card ch7-info-card";
     const infoHdr = document.createElement("div"); infoHdr.className="ch7-card-hdr";
 
-    // Collect all detail rows for the selected project(s) for download
-    // "Alle" = full project, no filters; "Gefiltert" = respects Baulos + FD
     const allProjectRows = () => {
-      // Union all detail arrays, deduplicate by External ID, strip internal cols
       const seen = new Set();
       const out  = [];
       for (const arr of [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail,
@@ -3162,7 +2835,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     const btnAll = document.createElement("button"); btnAll.className="ch7-card-dl";
     btnAll.textContent = "\u2b07 Alle";
     btnAll.title = "Alle Infopoints dieses Projekts (ohne Filter)";
-    btnAll.onclick = () => dlCSV(allProjectRows(), "infopoints_alle_"+fileSuffix().replace(/^[^_]+/,safe(selected[0]||"projekt"))+"_"+DATA.exportDate+".csv");
+    btnAll.onclick = () => dlCSV(allProjectRows(), "infopoints_alle_"+fileSuffix()+".csv");
     const btnFil = document.createElement("button"); btnFil.className="ch7-card-dl";
     btnFil.textContent = "\u2b07 Gefiltert";
     btnFil.title = "Infopoints mit aktiven Filtern (Baulos / FeederDrop)";
@@ -3193,16 +2866,14 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     }
     iw.appendChild(infoCard);
 
-    // Metric cards
     grid.innerHTML = "";
     CARDS.forEach(def => {
-    const card = document.createElement("div"); card.className = def.isFttx ? "ch7-card fttx-card" : "ch7-card";
-    const hdr  = document.createElement("div");
+      const card = document.createElement("div"); card.className = def.isFttx ? "ch7-card fttx-card" : "ch7-card";
+      const hdr  = document.createElement("div");
       hdr.className = def.isFttx ? "ch7-card-hdr fttx" : "ch7-card-hdr";
       const titleSpan = document.createElement("span"); titleSpan.textContent = def.title;
       hdr.appendChild(titleSpan);
 
-      // Download button — skip for FttX card (no detail rows)
       if (!def.isFttx) {
         const dlBtn = document.createElement("button"); dlBtn.className="ch7-card-dl";
         dlBtn.textContent = "\u2b07 Download";
@@ -3223,7 +2894,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     });
   }
 
-  /* ── Boot ────────────────────────────────────────────────────────────── */
   buildPCMList();
   buildList();
   buildBaulosList();
@@ -3235,8 +2905,6 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 Alle fünf Ansichten beziehen sich auf **`r n_total` aktive, nicht stornierte
 Infopoints** (dieselbe Basis wie im restlichen Bericht). Bei Auswahl mehrerer
 Projekte werden die Zahlen über alle ausgewählten Projekte aufsummiert.
-"Applied for" und "Open" zeigen die Wartezeit-Verteilung nur für Infopoints
-mit dem jeweiligen Status.
 :::
 
 ---
@@ -3247,9 +2915,9 @@ mit dem jeweiligen Status.
 
 ```{r metadata-table}
 tibble(
-  Feld  = c("Version", "Erstellt am", "Infopoints-Datei", "Projektliste-Datei", "Datenquelle"),
-  Wert  = c(version_number, as.character(today), infopoints_file, excel_file, base_path)
-) |>
+  Feld  = c("Version", "Erstellt am", "Datenstand (Infopoints)", "Infopoints-Datei", "Projektliste-Datei", "Baulos-Datei"),
+  Wert  = c(version_number, as.character(today), infopoints_export_date, infopoints_file, excel_file, baulos_lookup_file)
+) %>%
   reactable(
     sortable  = FALSE,
     bordered  = TRUE,
@@ -3267,8 +2935,8 @@ tibble(
 Projekte, die im Bericht berücksichtigt werden (ohne "on hold").
 
 ```{r active-projects-table}
-project_list_full |>
-  filter(`Bau/Planung` != "on hold") |>
+project_list_full %>%
+  filter(`Bau/Planung` != "on hold") %>%
   reactable(
     filterable      = TRUE,
     sortable        = TRUE,
@@ -3286,8 +2954,8 @@ project_list_full |>
 ### Projekte "On Hold"
 
 ```{r on-hold-projects-table}
-project_list_full |>
-  filter(`Bau/Planung` == "on hold") |>
+project_list_full %>%
+  filter(`Bau/Planung` == "on hold") %>%
   reactable(
     filterable      = TRUE,
     sortable        = TRUE,
