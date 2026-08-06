@@ -2258,7 +2258,7 @@ pp_projects = infopoints %>%
 
 # info box: one row per project with pcm, bau_planung, ende_bau_passiv_plan
 pp_info = infopoints %>%
-  distinct(`Planned by`, PCM, Bau_Planung, ende_bau_passiv_plan) %>%
+  distinct(`Planned by`, PB, PCM, Bau_Planung, ende_bau_passiv_plan) %>%
   filter(!is.na(`Planned by`))
 
 # fttx locations summary per project:
@@ -2281,7 +2281,12 @@ ch7_data = list(
   projects            = pp_projects,
   info                = pp_info,
   baulos_by_project   = pp_baulos_by_project,
-  pcm_list            = pp_info %>% distinct(PCM, `Planned by`) %>% filter(!is.na(PCM)) %>% arrange(PCM),
+  pcm_list            = pp_info %>% distinct(PCM, `Planned by`) %>%
+    filter(!is.na(PCM)) %>% arrange(PCM),
+  pb_list             = pp_info %>% distinct(PB, `Planned by`)  %>%
+    filter(!is.na(PB))  %>% arrange(PB),
+  bp_list             = pp_info %>% distinct(Bau_Planung, `Planned by`) %>%
+    filter(!is.na(Bau_Planung)) %>% arrange(Bau_Planung),
   status              = pp_status,
   status_detail       = pp_status_detail,
   feederdrop          = pp_feederdrop,
@@ -2350,7 +2355,12 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-tbl tbody tr.na-red td{color:#c0392b;font-weight:600}
 .ch7-tbl tbody tr.na-red td:first-child{border-left:3px solid #c0392b;padding-left:8px}
 .ch7-tbl tbody tr.na-grey td{color:#bbb}
-.ch7-tbl td{padding:7px 11px}
+.ch7-tbl tbody tr.na-amber{background:#fff8e1}
+.ch7-tbl tbody tr.na-amber td{color:#856404;font-weight:600}
+.ch7-tbl tbody tr.na-amber td:first-child{border-left:3px solid #e6a817;padding-left:8px}
+.ch7-tbl tbody tr.na-green{background:#f0faf5}
+.ch7-tbl tbody tr.na-green td{color:#18bc9c;font-weight:600}
+.ch7-tbl tbody tr.na-green td:first-child{border-left:3px solid #18bc9c;padding-left:8px}.ch7-tbl td{padding:7px 11px}
 .ch7-tbl td.r{text-align:right;font-variant-numeric:tabular-nums}
 .ch7-tbl td.p{text-align:right;color:#888;font-size:.82em}
 .ch7-tbl tfoot tr{background:#4a6580}
@@ -2361,6 +2371,9 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-tbl thead th:nth-child(2),.ch7-tbl tbody td:nth-child(2),.ch7-tbl tfoot td:nth-child(2){width:22%}
 .ch7-tbl thead th:nth-child(3),.ch7-tbl tbody td:nth-child(3),.ch7-tbl tfoot td:nth-child(3){width:16%}
 .ch7-tbl thead th:nth-child(4),.ch7-tbl tbody td:nth-child(4),.ch7-tbl tfoot td:nth-child(4){width:12%}
+.fttx-card .ch7-tbl thead th:first-child,.fttx-card .ch7-tbl tbody td:first-child,.fttx-card .ch7-tbl tfoot td:first-child{width:40%}
+.fttx-card .ch7-tbl thead th:nth-child(2),.fttx-card .ch7-tbl tbody td:nth-child(2),.fttx-card .ch7-tbl tfoot td:nth-child(2){width:30%}
+.fttx-card .ch7-tbl thead th:nth-child(3),.fttx-card .ch7-tbl tbody td:nth-child(3),.fttx-card .ch7-tbl tfoot td:nth-child(3){width:30%}
 .ch7-dl{background:none;border:none;cursor:pointer;font-size:1em;color:#aab;padding:2px 5px;border-radius:3px;line-height:1;transition:color .12s,background .12s}
 .ch7-dl:hover{color:#2c3e50;background:#e8ecef}
 .ch7-empty{padding:14px 15px;color:#888;font-style:italic;font-size:.88em}
@@ -2400,10 +2413,22 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     </div>
     <div class="ch7-filter-col">
       <label class="ch7-sel-label">PCM</label>
-      <input class="ch7-search" id="ch7pcms" type="text" placeholder="PCM suchen…">
-      <div class="ch7-count" id="ch7pcmc"></div>
-      <div class="ch7-proj-list" id="ch7pcml"></div>
+      <select class="ch7-filter-select" id="ch7pcms">
+        <option value="">— alle PCMs —</option>
+      </select>
       <button class="ch7-clear-btn" id="ch7pcmclear" onclick="ch7ClearPCM()">✕ PCM zurücksetzen</button>
+
+      <label class="ch7-sel-label" style="margin-top:14px">Planungsbüro (PB)</label>
+      <select class="ch7-filter-select" id="ch7pb">
+        <option value="">— alle PBs —</option>
+      </select>
+      <button class="ch7-clear-btn" id="ch7pbclear" onclick="ch7ClearPB()">✕ PB zurücksetzen</button>
+
+      <label class="ch7-sel-label" style="margin-top:14px">Projektstatus</label>
+      <select class="ch7-filter-select" id="ch7bp">
+        <option value="">— alle Status —</option>
+      </select>
+      <button class="ch7-clear-btn" id="ch7bpclear" onclick="ch7ClearBP()">✕ Status zurücksetzen</button>
     </div>
   </div>
 
@@ -2418,96 +2443,170 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 (function () {
   const raw  = JSON.parse(document.getElementById("ch7-data").textContent);
   const DATA = {
-    exportDate:         raw.exportDate || "",
-    projects:           raw.projects   || [],
-    info:               raw.info       || [],
-    baulos_by_project:  raw.baulos_by_project || [],
-    pcm_list:           raw.pcm_list   || [],
-    status:             raw.status     || [],
-    status_detail:      raw.status_detail || [],
-    feederdrop:         raw.feederdrop || [],
-    feederdrop_detail:  raw.feederdrop_detail || [],
-    built:              raw.built      || [],
-    built_detail:       raw.built_detail || [],
-    applied_for:        raw.applied_for || [],
-    applied_for_detail: raw.applied_for_detail || [],
-    open:               raw.open       || [],
-    open_detail:        raw.open_detail || [],
-    feeder_no_lr:       raw.feeder_no_lr || [],
-    feeder_no_lr_detail:raw.feeder_no_lr_detail || [],
-    hp_missing:         raw.hp_missing || [],
-    hp_missing_detail:  raw.hp_missing_detail || [],
-    fttx:               raw.fttx || [],
+    exportDate:          raw.exportDate || "",
+    projects:            raw.projects   || [],
+    info:                raw.info       || [],
+    baulos_by_project:   raw.baulos_by_project || [],
+    pcm_list:            raw.pcm_list   || [],
+    pb_list:             raw.pb_list    || [],
+    bp_list:             raw.bp_list    || [],
+    status:              raw.status     || [],
+    status_detail:       raw.status_detail || [],
+    feederdrop:          raw.feederdrop || [],
+    feederdrop_detail:   raw.feederdrop_detail || [],
+    built:               raw.built      || [],
+    built_detail:        raw.built_detail || [],
+    applied_for:         raw.applied_for || [],
+    applied_for_detail:  raw.applied_for_detail || [],
+    open:                raw.open       || [],
+    open_detail:         raw.open_detail || [],
+    feeder_no_lr:        raw.feeder_no_lr || [],
+    feeder_no_lr_detail: raw.feeder_no_lr_detail || [],
+    hp_missing:          raw.hp_missing || [],
+    hp_missing_detail:   raw.hp_missing_detail || [],
+    fttx:                raw.fttx || [],
     fttx_scoping_levels: raw.fttx_scoping_levels || ["In Scope","Outside Build Scope","Non Connectable","NA / leer"]
   };
 
-  let selected  = [];
-  let selBaulos = "";
-  let selPCM    = "";
-  let selFD     = [];
+  var selected  = [];
+  var selBaulos = "";
+  var selPCM    = "";
+  var selPB     = "";
+  var selBP     = "";
+  var selFD     = [];
 
-  const FD_IDS = ["ch7fd0","ch7fd1","ch7fd2"];
-  FD_IDS.forEach(id => {
-    document.getElementById(id).addEventListener("change", () => {
-      selFD = FD_IDS.map(i => document.getElementById(i)).filter(cb => cb.checked).map(cb => cb.value);
+  var FD_IDS = ["ch7fd0","ch7fd1","ch7fd2"];
+  FD_IDS.forEach(function(id) {
+    document.getElementById(id).addEventListener("change", function() {
+      selFD = FD_IDS.map(function(i) { return document.getElementById(i); })
+                    .filter(function(cb) { return cb.checked; })
+                    .map(function(cb) { return cb.value; });
       document.getElementById("ch7fdclear").style.display = selFD.length ? "inline-block" : "none";
       renderCards();
     });
   });
-  window.ch7ClearFD = () => {
-    FD_IDS.forEach(id => { document.getElementById(id).checked = false; });
+  window.ch7ClearFD = function() {
+    FD_IDS.forEach(function(id) { document.getElementById(id).checked = false; });
     selFD = [];
     document.getElementById("ch7fdclear").style.display = "none";
     renderCards();
   };
 
-  function buildPCMList(filter) {
-    filter = (filter || "").toLowerCase();
-    const allPCMs = [...new Set(DATA.pcm_list.map(r => r.PCM))].sort();
-    const shown   = filter ? allPCMs.filter(p => p.toLowerCase().includes(filter)) : allPCMs;
-    document.getElementById("ch7pcmc").textContent = shown.length + " von " + allPCMs.length + " PCMs";
-    const el = document.getElementById("ch7pcml");
-    el.innerHTML = "";
-    shown.forEach(pcm => {
-      const d = document.createElement("div");
-      d.className = "ch7-proj-item" + (selPCM === pcm ? " sel" : "");
-      d.textContent = pcm;
-      d.onclick = () => {
-        selPCM = selPCM === pcm ? "" : pcm;
-        if (selPCM) {
-          const pp = DATA.pcm_list.filter(r => r.PCM === selPCM).map(r => r["Planned by"]);
-          selected = selected.filter(p => pp.includes(p));
-          selBaulos = "";
-        }
-        document.getElementById("ch7pcmclear").style.display = selPCM ? "inline-block" : "none";
-        buildPCMList(document.getElementById("ch7pcms").value);
-        buildList(document.getElementById("ch7s").value);
-        buildBaulosList(); renderTags(); renderCards();
-      };
-      el.appendChild(d);
+function buildPCMList() {
+    var sel = document.getElementById("ch7pcms");
+    var allPCMs = Array.from(new Set(DATA.pcm_list.map(function(r) { return r.PCM; }))).sort();
+    sel.innerHTML = '<option value="">— alle PCMs —</option>';
+    allPCMs.forEach(function(pcm) {
+      var o = document.createElement("option");
+      o.value = pcm; o.textContent = pcm;
+      if (pcm === selPCM) o.selected = true;
+      sel.appendChild(o);
     });
   }
-  document.getElementById("ch7pcms").addEventListener("input", e => buildPCMList(e.target.value));
-  window.ch7ClearPCM = () => {
+  document.getElementById("ch7pcms").addEventListener("change", function(e) {
+    selPCM = e.target.value;
+    document.getElementById("ch7pcmclear").style.display = selPCM ? "inline-block" : "none";
+    if (selPCM) {
+      var pp = new Set(DATA.pcm_list.filter(function(r) { return r.PCM === selPCM; }).map(function(r) { return r["Planned by"]; }));
+      selected = selected.filter(function(p) { return pp.has(p); });
+      selBaulos = "";
+    }
+    buildList(document.getElementById("ch7s").value);
+    buildBaulosList(); renderTags(); renderCards();
+  });
+  window.ch7ClearPCM = function() {
     selPCM = "";
     document.getElementById("ch7pcms").value = "";
     document.getElementById("ch7pcmclear").style.display = "none";
-    buildPCMList(); buildList(document.getElementById("ch7s").value);
+    buildList(document.getElementById("ch7s").value);
+    renderTags(); renderCards();
+  };
+
+  function buildPBList() {
+    var sel    = document.getElementById("ch7pb");
+    var allPBs = Array.from(new Set(DATA.pb_list.map(function(r) { return r.PB; }))).sort();
+    sel.innerHTML = '<option value="">— alle PBs —</option>';
+    allPBs.forEach(function(pb) {
+      var o = document.createElement("option");
+      o.value = pb; o.textContent = pb;
+      if (pb === selPB) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+  document.getElementById("ch7pb").addEventListener("change", function(e) {
+    selPB = e.target.value;
+    document.getElementById("ch7pbclear").style.display = selPB ? "inline-block" : "none";
+    if (selPB) {
+      var pp = new Set(DATA.pb_list.filter(function(r) { return r.PB === selPB; }).map(function(r) { return r["Planned by"]; }));
+      selected = selected.filter(function(p) { return pp.has(p); });
+      selBaulos = "";
+    }
+    buildList(document.getElementById("ch7s").value);
+    buildBaulosList(); renderTags(); renderCards();
+  });
+  window.ch7ClearPB = function() {
+    selPB = "";
+    document.getElementById("ch7pb").value = "";
+    document.getElementById("ch7pbclear").style.display = "none";
+    buildList(document.getElementById("ch7s").value);
+    renderTags(); renderCards();
+  };
+
+  function buildBPList() {
+    var sel   = document.getElementById("ch7bp");
+    var allBP = Array.from(new Set(DATA.bp_list.map(function(r) { return r.Bau_Planung; }))).sort();
+    sel.innerHTML = '<option value="">— alle Status —</option>';
+    allBP.forEach(function(bp) {
+      var o = document.createElement("option");
+      o.value = bp; o.textContent = bp;
+      if (bp === selBP) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+  document.getElementById("ch7bp").addEventListener("change", function(e) {
+    selBP = e.target.value;
+    document.getElementById("ch7bpclear").style.display = selBP ? "inline-block" : "none";
+    if (selBP) {
+      var pp = new Set(DATA.bp_list.filter(function(r) { return r.Bau_Planung === selBP; }).map(function(r) { return r["Planned by"]; }));
+      selected = selected.filter(function(p) { return pp.has(p); });
+      selBaulos = "";
+    }
+    buildList(document.getElementById("ch7s").value);
+    buildBaulosList(); renderTags(); renderCards();
+  });
+  window.ch7ClearBP = function() {
+    selBP = "";
+    document.getElementById("ch7bp").value = "";
+    document.getElementById("ch7bpclear").style.display = "none";
+    buildList(document.getElementById("ch7s").value);
+    renderTags(); renderCards();
   };
 
   function buildList(filter) {
     filter = (filter || "").toLowerCase();
-    const pp = selPCM ? new Set(DATA.pcm_list.filter(r => r.PCM === selPCM).map(r => r["Planned by"])) : null;
-    const all = pp ? DATA.projects.filter(p => pp.has(p)) : DATA.projects;
-    const shown = filter ? all.filter(p => p.toLowerCase().includes(filter)) : all;
+    var all = DATA.projects;
+    if (selPCM) {
+      var pcmSet = new Set(DATA.pcm_list.filter(function(r) { return r.PCM === selPCM; }).map(function(r) { return r["Planned by"]; }));
+      all = all.filter(function(p) { return pcmSet.has(p); });
+    }
+    if (selPB) {
+      var pbSet = new Set(DATA.pb_list.filter(function(r) { return r.PB === selPB; }).map(function(r) { return r["Planned by"]; }));
+      all = all.filter(function(p) { return pbSet.has(p); });
+    }
+    if (selBP) {
+      var bpSet = new Set(DATA.bp_list.filter(function(r) { return r.Bau_Planung === selBP; }).map(function(r) { return r["Planned by"]; }));
+      all = all.filter(function(p) { return bpSet.has(p); });
+    }
+    var shown = filter ? all.filter(function(p) { return p.toLowerCase().includes(filter); }) : all;
     document.getElementById("ch7c").textContent = shown.length + " von " + all.length + " Projekten";
-    const el = document.getElementById("ch7l"); el.innerHTML = "";
-    shown.forEach(p => {
-      const d = document.createElement("div");
+    var el = document.getElementById("ch7l");
+    el.innerHTML = "";
+    shown.forEach(function(p) {
+      var d = document.createElement("div");
       d.className = "ch7-proj-item" + (selected.includes(p) ? " sel" : "");
       d.textContent = p;
-      d.onclick = () => {
-        selected = selected.includes(p) ? selected.filter(x => x !== p) : [...selected, p];
+      d.onclick = function() {
+        selected = selected.includes(p) ? selected.filter(function(x) { return x !== p; }) : selected.concat([p]);
         selBaulos = "";
         buildList(document.getElementById("ch7s").value);
         buildBaulosList(); renderTags(); renderCards();
@@ -2515,47 +2614,52 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       el.appendChild(d);
     });
   }
-  document.getElementById("ch7s").addEventListener("input", e => buildList(e.target.value));
+  document.getElementById("ch7s").addEventListener("input", function(e) { buildList(e.target.value); });
 
   function buildBaulosList() {
-    const sel = document.getElementById("ch7bl");
-    const btn = document.getElementById("ch7blc");
-    const names = selected.length === 1
-      ? DATA.baulos_by_project.filter(r => r["Planned by"] === selected[0]).map(r => r.baulos_name).sort()
+    var sel  = document.getElementById("ch7bl");
+    var btn  = document.getElementById("ch7blc");
+    var names = selected.length === 1
+      ? DATA.baulos_by_project.filter(function(r) { return r["Planned by"] === selected[0]; }).map(function(r) { return r.baulos_name; }).sort()
       : [];
     sel.innerHTML = '<option value="">— kein Baulos ausgewählt —</option>';
     if (!names.length) {
       sel.disabled = true;
       if (selected.length === 1) {
-        const o = document.createElement("option"); o.disabled = true;
+        var o = document.createElement("option"); o.disabled = true;
         o.textContent = "Keine Baulose für dieses Projekt"; sel.appendChild(o);
       }
     } else {
       sel.disabled = false;
-      names.forEach(n => {
-        const o = document.createElement("option"); o.value = n; o.textContent = n;
+      names.forEach(function(n) {
+        var o = document.createElement("option"); o.value = n; o.textContent = n;
         if (n === selBaulos) o.selected = true; sel.appendChild(o);
       });
     }
     btn.style.display = selBaulos ? "inline-block" : "none";
   }
-  document.getElementById("ch7bl").addEventListener("change", e => {
+  document.getElementById("ch7bl").addEventListener("change", function(e) {
     selBaulos = e.target.value;
     document.getElementById("ch7blc").style.display = selBaulos ? "inline-block" : "none";
     renderCards();
   });
-  window.ch7ClearBaulos = () => {
-    selBaulos = ""; document.getElementById("ch7bl").value = "";
-    document.getElementById("ch7blc").style.display = "none"; renderCards();
+  window.ch7ClearBaulos = function() {
+    selBaulos = "";
+    document.getElementById("ch7bl").value = "";
+    document.getElementById("ch7blc").style.display = "none";
+    renderCards();
   };
 
   function renderTags() {
-    const w = document.getElementById("ch7t"); w.innerHTML = "";
-    selected.forEach(p => {
-      const t = document.createElement("div"); t.className = "ch7-tag";
+    var w = document.getElementById("ch7t");
+    w.innerHTML = "";
+    selected.forEach(function(p) {
+      var t = document.createElement("div");
+      t.className = "ch7-tag";
       t.innerHTML = p + ' <button title="Entfernen">\xd7</button>';
-      t.querySelector("button").onclick = () => {
-        selected = selected.filter(x => x !== p); selBaulos = "";
+      t.querySelector("button").onclick = function() {
+        selected = selected.filter(function(x) { return x !== p; });
+        selBaulos = "";
         buildList(document.getElementById("ch7s").value);
         buildBaulosList(); renderTags(); renderCards();
       };
@@ -2565,208 +2669,225 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 
   function dlCSV(rows, filename) {
     if (!rows || !rows.length) return;
-    const cols = Object.keys(rows[0]);
-    const esc = v => { const s = v == null ? "" : String(v); return /[";,\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
-    const csv = [cols.join(";"), ...rows.map(r => cols.map(c => esc(r[c])).join(";"))].join("\r\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}));
+    var cols = Object.keys(rows[0]);
+    var esc = function(v) { var s = v == null ? "" : String(v); return /[";,\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+    var csv = [cols.join(";")].concat(rows.map(function(r) { return cols.map(function(c) { return esc(r[c]); }).join(";"); })).join("\r\n");
+    var url = URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}));
     Object.assign(document.createElement("a"),{href:url,download:filename}).click();
     URL.revokeObjectURL(url);
   }
   function safe(s) { return String(s).replace(/[^a-zA-Z0-9\u00C0-\u017E_-]+/g,"_").slice(0,50); }
   function fileSuffix() {
-    const safeP  = selected.length===1 ? safe(selected[0]) : selected.length+"Projekte";
-    const safeBl = selBaulos ? "_"+safe(selBaulos) : "";
-    const safeFD = selFD.length ? "_FD-"+selFD.map(safe).join("+") : "";
+    var safeP  = selected.length===1 ? safe(selected[0]) : selected.length+"Projekte";
+    var safeBl = selBaulos ? "_"+safe(selBaulos) : "";
+    var safeFD = selFD.length ? "_FD-"+selFD.map(safe).join("+") : "";
     return safeP + safeBl + safeFD + "_" + DATA.exportDate;
   }
 
   function applyFD(rows) {
-    return selFD.length ? rows.filter(r => selFD.includes(r["FeederDrop Level"])) : rows;
+    return selFD.length ? rows.filter(function(r) { return selFD.includes(r["FeederDrop Level"]); }) : rows;
   }
 
   function sumCats(aggArr, detailArr, catField) {
-    let mTot = new Map();
+    var mTot = new Map();
     if (selFD.length) {
-      applyFD(detailArr.filter(r => selected.includes(r["Planned by"]))).forEach(r => {
-        const k = r.category || "";
+      applyFD(detailArr.filter(function(r) { return selected.includes(r["Planned by"]); })).forEach(function(r) {
+        var k = r.category || "";
         mTot.set(k, (mTot.get(k) || 0) + 1);
       });
     } else {
-      aggArr.filter(r => selected.includes(r["Planned by"])).forEach(r => {
-        const k = r[catField] || r.category || "";
+      aggArr.filter(function(r) { return selected.includes(r["Planned by"]); }).forEach(function(r) {
+        var k = r[catField] || r.category || "";
         mTot.set(k, (mTot.get(k) || 0) + (r.n || 0));
       });
     }
-
-    let mBl = null;
+    var mBl = null;
     if (selBaulos) {
       mBl = new Map();
-      applyFD(detailArr.filter(r => selected.includes(r["Planned by"]) && r.baulos_name === selBaulos))
-        .forEach(r => { const k = r.category || ""; mBl.set(k, (mBl.get(k) || 0) + 1); });
+      applyFD(detailArr.filter(function(r) { return selected.includes(r["Planned by"]) && r.baulos_name === selBaulos; }))
+        .forEach(function(r) { var k = r.category || ""; mBl.set(k, (mBl.get(k) || 0) + 1); });
     }
-
-    return [...mTot.entries()].map(([cat, nTotal]) => ({
-      cat, nTotal, nBaulos: mBl !== null ? (mBl.get(cat) || 0) : null
-    })).sort((a,b) => b.nTotal - a.nTotal);
+    return Array.from(mTot.entries()).map(function(e) {
+      return { cat: e[0], nTotal: e[1], nBaulos: mBl !== null ? (mBl.get(e[0]) || 0) : null };
+    }).sort(function(a,b) { return b.nTotal - a.nTotal; });
   }
 
-  const ALL_FD = ["Drop Level","Feeder Level","NA / leer"];
+  var ALL_FD = ["Drop Level","Feeder Level","NA / leer"];
 
-  function buildTable(aggRows, detailArr, colLabel, prefix, order) {
+function buildTable(aggRows, detailArr, colLabel, prefix, order, warnNA, greyRows, greenIfZero) {
+    greyRows = greyRows || [];
+    greenIfZero = greenIfZero || false;
     if (order) {
-      const m = new Map(aggRows.map(r => [r.cat, r]));
-      const hasBl = selBaulos ? true : false;
-      aggRows = order.map(o => m.get(o) || {cat:o, nTotal:0, nBaulos: hasBl ? 0 : null});
+      var m1 = new Map(aggRows.map(function(r) { return [r.cat, r]; }));
+      var hasBl1 = selBaulos ? true : false;
+      aggRows = order.map(function(o) { return m1.get(o) || {cat:o, nTotal:0, nBaulos: hasBl1 ? 0 : null}; });
     }
     if (colLabel === "Level") {
-      const m = new Map(aggRows.map(r => [r.cat, r]));
-      const hasBl = selBaulos ? true : false;
-      aggRows = ALL_FD.map(s => m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null});
+      var m2 = new Map(aggRows.map(function(r) { return [r.cat, r]; }));
+      var hasBl2 = selBaulos ? true : false;
+      aggRows = ALL_FD.map(function(s) { return m2.get(s) || {cat:s, nTotal:0, nBaulos: hasBl2 ? 0 : null}; });
     }
-
     if (!aggRows.length) {
-      const p = document.createElement("p"); p.className="ch7-empty"; p.textContent="Keine Daten."; return p;
+      var ep = document.createElement("p"); ep.className="ch7-empty"; ep.textContent="Keine Daten."; return ep;
     }
-
-    const hasBaulos  = aggRows[0].nBaulos !== null;
-    const totalTotal = aggRows.reduce((s,r) => s+r.nTotal, 0);
-    const totalBl    = hasBaulos ? aggRows.reduce((s,r) => s+(r.nBaulos||0), 0) : null;
-    const anzahlHead = hasBaulos ? "Baulos\u00a0/\u00a0Total" : "Anzahl";
-    const totalFoot  = hasBaulos
+    var hasBaulos  = aggRows[0].nBaulos !== null;
+    var totalTotal = aggRows.reduce(function(s,r) { return s+r.nTotal; }, 0);
+    var totalBl    = hasBaulos ? aggRows.reduce(function(s,r) { return s+(r.nBaulos||0); }, 0) : null;
+    var anzahlHead = hasBaulos ? "Baulos\u00a0/\u00a0Total" : "Anzahl";
+    var totalFoot  = hasBaulos
       ? (totalBl + "\u00a0/\u00a0" + totalTotal.toLocaleString("de"))
       : totalTotal.toLocaleString("de");
-
-    const sorted = order ? aggRows : [
-      ...aggRows.filter(r => r.cat === "NA / leer"),
-      ...aggRows.filter(r => r.cat !== "NA / leer")
-    ];
-
-    const tbl = document.createElement("table"); tbl.className="ch7-tbl";
+    var sorted = order ? aggRows : aggRows.filter(function(r) { return r.cat === "NA / leer"; }).concat(aggRows.filter(function(r) { return r.cat !== "NA / leer"; }));
+    var tbl = document.createElement("table"); tbl.className="ch7-tbl";
     tbl.innerHTML =
       "<thead><tr><th>"+colLabel+"</th><th class='r'>"+anzahlHead+"</th><th class='r p'>%</th><th></th></tr></thead>" +
       "<tfoot><tr><td>Total</td><td class='r'>"+totalFoot+"</td><td class='r'>100%</td><td></td></tr></tfoot>";
-
-    const tb = document.createElement("tbody");
-    sorted.forEach(row => {
-      const isNA   = row.cat === "NA / leer";
-      const isZero = row.nTotal === 0 && (!hasBaulos || (row.nBaulos||0) === 0);
-      const pct = totalTotal > 0
+    var tb = document.createElement("tbody");
+    sorted.forEach(function(row) {
+      var isNA   = row.cat === "NA / leer";
+      var isZero = row.nTotal === 0 && (!hasBaulos || (row.nBaulos||0) === 0);
+      var pct = totalTotal > 0
         ? (hasBaulos
             ? (row.nTotal > 0 ? (100*(row.nBaulos||0)/row.nTotal).toFixed(1)+"%" : "\u2014")
             : (100*row.nTotal/totalTotal).toFixed(1)+"%")
         : "\u2014";
-      const nBl = row.nBaulos !== null ? (row.nBaulos || 0) : null;
-      const anzahl = hasBaulos
+      var nBl = row.nBaulos !== null ? (row.nBaulos || 0) : null;
+      var anzahl = hasBaulos
         ? (nBl + "\u00a0/\u00a0" + row.nTotal.toLocaleString("de"))
         : row.nTotal.toLocaleString("de");
-
-      const tr = document.createElement("tr");
-      if (isNA && isZero)     tr.className = "na-grey";
-      else if (isNA)          tr.className = "na-red";
-
-      tr.innerHTML = "<td>"+row.cat+"</td><td class='r'>"+anzahl+
+      var tr = document.createElement("tr");
+      if (isNA && isZero)              tr.className = "na-grey";
+      else if (isNA && !warnNA)        tr.className = "na-red";
+      else if (isNA && warnNA)         tr.className = "na-amber";
+else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "na-green" : "na-grey";      tr.innerHTML = "<td>"+row.cat+"</td><td class='r'>"+anzahl+
         "</td><td class='p'>"+pct+"</td><td style='text-align:center;width:34px;'>"+
-        "<button class='ch7-dl' title='Rohdaten herunterladen'>\u2b07</button></td>";
-      tr.querySelector(".ch7-dl").onclick = () => {
-        const rows = applyFD(detailArr.filter(r =>
-          selected.includes(r["Planned by"]) && r.category === row.cat &&
-          (!selBaulos || r.baulos_name === selBaulos)
-        )).map(r => { const o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
-        dlCSV(rows, prefix+"_"+safe(row.cat)+"_"+fileSuffix()+".csv");
-      };
+        "<button class='ch7-dl' title='Rohdaten herunterladen' style='"+(isZero?"visibility:hidden;":"")+"'>\u2b07</button></td>";
+   (function(row) {
+        tr.querySelector(".ch7-dl").onclick = function() {
+          var rows = applyFD(detailArr.filter(function(r) {
+            return selected.includes(r["Planned by"]) && r.category === row.cat && (!selBaulos || r.baulos_name === selBaulos);
+          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+          dlCSV(rows, prefix+"_"+safe(row.cat)+"_"+fileSuffix()+".csv");
+        };
+      })(row);
       tb.appendChild(tr);
     });
     tbl.insertBefore(tb, tbl.querySelector("tfoot"));
     return tbl;
   }
 
-  const WAIT = ["< 4 Wochen","4\u20138 Wochen","8\u201312 Wochen","> 12 Wochen","Kein Datum"];
-  const ALL_STATUSES = ["open","applied for","receive","rejected","no response","NA / leer"];
+  var WAIT = ["< 4 Wochen","4\u20138 Wochen","8\u201312 Wochen","> 12 Wochen","Kein Datum"];
+  var ALL_STATUSES = ["open","applied for","receive","rejected","no response","NA / leer"];
 
-  const CARDS = [
+  var CARDS = [
     { title:"Status", col:"Status", prefix:"status",
-      agg:() => {
-        const found = sumCats(DATA.status, DATA.status_detail, "category");
-        const m = new Map(found.map(r=>[r.cat,r]));
-        const hasBl = selBaulos;
-        return ALL_STATUSES.map(s => m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null});
+      agg: function() {
+        var found = sumCats(DATA.status, DATA.status_detail, "category");
+        var m = new Map(found.map(function(r) { return [r.cat, r]; }));
+        var hasBl = selBaulos ? true : false;
+        return ALL_STATUSES.map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
       }, detail:DATA.status_detail, order:null },
     { title:"FeederDrop Level", col:"Level", prefix:"feederdrop",
-      agg:()=>sumCats(DATA.feederdrop, DATA.feederdrop_detail, "category"),
+      agg: function() { return sumCats(DATA.feederdrop, DATA.feederdrop_detail, "category"); },
       detail:DATA.feederdrop_detail, order:null },
-    { title:"Built (gebaut ja/nein)", col:"Built", prefix:"built",
-      agg:()=>sumCats(DATA.built, DATA.built_detail, "category"),
-      detail:DATA.built_detail, order:null },
+      { title:"Built (gebaut ja/nein)", col:"Built", prefix:"built",
+      warnNA: true,
+      agg: function() {
+        var found = sumCats(DATA.built, DATA.built_detail, "category");
+        var m = new Map(found.map(function(r) { return [r.cat, r]; }));
+        var hasBl = selBaulos ? true : false;
+        return ["Yes","No","NA / leer"].map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
+      }, detail:DATA.built_detail, order:["Yes","No","NA / leer"] },
     { title:"Feeder gebaut ohne LR", col:"Kennzahl", prefix:"feeder_gebaut_ohne_lr",
-      agg:()=>{
-        let nTotal, nBaulos;
+      greyRows: ["Feeder gebaut ohne LR"],
+      greenIfZero: true,
+      agg: function() {
+        var nTotal, nBaulos;
         if (selFD.length) {
-          const fd = applyFD(DATA.feeder_no_lr_detail.filter(r => selected.includes(r["Planned by"])));
+          var fd = applyFD(DATA.feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]); }));
           nTotal = fd.length;
-          nBaulos = selBaulos ? applyFD(DATA.feeder_no_lr_detail.filter(r =>
-            selected.includes(r["Planned by"]) && r.baulos_name === selBaulos)).length : null;
+          nBaulos = selBaulos ? applyFD(DATA.feeder_no_lr_detail.filter(function(r) {
+            return selected.includes(r["Planned by"]) && r.baulos_name === selBaulos;
+          })).length : null;
         } else {
-          nTotal = DATA.feeder_no_lr.filter(r=>selected.includes(r["Planned by"])).reduce((s,r)=>s+(r.n||0),0);
+          nTotal = DATA.feeder_no_lr.filter(function(r) { return selected.includes(r["Planned by"]); }).reduce(function(s,r) { return s+(r.n||0); }, 0);
           nBaulos = selBaulos
-            ? DATA.feeder_no_lr_detail.filter(r=>selected.includes(r["Planned by"]) && r.baulos_name===selBaulos).length
+            ? DATA.feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && r.baulos_name===selBaulos; }).length
             : null;
         }
-        return [{cat:"Feeder gebaut ohne LR", nTotal, nBaulos}];
+        return [{cat:"Feeder gebaut ohne LR", nTotal: nTotal, nBaulos: nBaulos}];
       }, detail:DATA.feeder_no_lr_detail, order:null },
     { title:"Applied for \u2014 Wartezeit", col:"Wartezeit", prefix:"applied_for",
-      agg:()=>sumCats(DATA.applied_for, DATA.applied_for_detail, "category"),
+      agg: function() { return sumCats(DATA.applied_for, DATA.applied_for_detail, "category"); },
       detail:DATA.applied_for_detail, order:WAIT },
     { title:"Open \u2014 Wartezeit", col:"Wartezeit", prefix:"open",
-      agg:()=>sumCats(DATA.open, DATA.open_detail, "category"),
+      agg: function() { return sumCats(DATA.open, DATA.open_detail, "category"); },
       detail:DATA.open_detail, order:WAIT },
     { title:"HP behind fehlt", col:"Status", prefix:"hp_missing",
-      agg:() => {
-        const found = sumCats(DATA.hp_missing, DATA.hp_missing_detail, "category");
-        const m = new Map(found.map(r=>[r.cat,r]));
-        const hasBl = selBaulos ? true : false;
-        return ALL_STATUSES.map(s => m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null});
+      greyRows: ["receive"],
+      agg: function() {
+        var found = sumCats(DATA.hp_missing, DATA.hp_missing_detail, "category");
+        var m = new Map(found.map(function(r) { return [r.cat, r]; }));
+        var hasBl = selBaulos ? true : false;
+        return ALL_STATUSES.map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
       }, detail:DATA.hp_missing_detail, order:null },
     { title:"FttX Locations Scoping", col:null, prefix:"fttx",
       isFttx: true,
-      agg:() => {
-        const levels = DATA.fttx_scoping_levels;
-        const mN  = new Map();
-        const mTU = new Map();
-        let rows = DATA.fttx.filter(r => selected.includes(r["Planned by"]));
-        if (selBaulos) rows = rows.filter(r => r.baulos_name === selBaulos);
-        rows.forEach(r => {
-          const k = r.Scoping || "NA / leer";
+      agg: function() {
+        var levels = DATA.fttx_scoping_levels;
+        var mN  = new Map();
+        var mTU = new Map();
+        var rows = DATA.fttx.filter(function(r) { return selected.includes(r["Planned by"]); });
+        if (selBaulos) rows = rows.filter(function(r) { return r.baulos_name === selBaulos; });
+        rows.forEach(function(r) {
+          var k = r.Scoping || "NA / leer";
           mN.set(k,  (mN.get(k)  || 0) + (r.n      || 0));
           mTU.set(k, (mTU.get(k) || 0) + (r.sum_tu || 0));
         });
-        return levels.map(s => ({
-          cat: s, n: mN.get(s) || 0, sum_tu: mTU.get(s) || 0
-        }));
-      }, detail:null, order:null }
+        var mNBl  = new Map();
+        var mTUBl = new Map();
+        if (selBaulos) {
+          DATA.fttx.filter(function(r) { return selected.includes(r["Planned by"]) && r.baulos_name === selBaulos; }).forEach(function(r) {
+            var k = r.Scoping || "NA / leer";
+            mNBl.set(k,  (mNBl.get(k)  || 0) + (r.n      || 0));
+            mTUBl.set(k, (mTUBl.get(k) || 0) + (r.sum_tu || 0));
+          });
+        }
+        return levels.map(function(s) { return { cat: s, n: mN.get(s) || 0, sum_tu: mTU.get(s) || 0, nBaulos: selBaulos ? (mNBl.get(s) || 0) : null, sum_tu_baulos: selBaulos ? (mTUBl.get(s) || 0) : null }; });      }, detail:null, order:null }
   ];
 
   function buildFttxTable(aggRows) {
-    const totalN  = aggRows.reduce((s,r) => s + r.n,      0);
-    const totalTU = aggRows.reduce((s,r) => s + r.sum_tu, 0);
-    const sorted = [
-      ...aggRows.filter(r => r.cat === "NA / leer"),
-      ...aggRows.filter(r => r.cat !== "NA / leer")
-    ];
-    const tbl = document.createElement("table"); tbl.className="ch7-tbl";
+    var hasBaulos = selBaulos ? true : false;
+    var totalN    = aggRows.reduce(function(s,r) { return s + r.n; },      0);
+    var totalTU   = aggRows.reduce(function(s,r) { return s + r.sum_tu; }, 0);
+    var totalNBl  = hasBaulos ? aggRows.reduce(function(s,r) { return s + (r.nBaulos||0); },      0) : null;
+    var totalTUBl = hasBaulos ? aggRows.reduce(function(s,r) { return s + (r.sum_tu_baulos||0); }, 0) : null;
+    var sorted = aggRows.filter(function(r) { return r.cat === "NA / leer"; }).concat(aggRows.filter(function(r) { return r.cat !== "NA / leer"; }));
+    var adrHead  = hasBaulos ? "Baulos Adressen\u00a0/\u00a0Total Adressen" : "Adressen";
+    var adrFoot  = hasBaulos ? (totalNBl + "\u00a0/\u00a0" + totalN.toLocaleString("de")) : totalN.toLocaleString("de");
+    var tuFoot   = hasBaulos ? (Math.round(totalTUBl).toLocaleString("de") + "\u00a0/\u00a0" + Math.round(totalTU).toLocaleString("de")) : Math.round(totalTU).toLocaleString("de");
+    var tuHead   = hasBaulos ? "Baulos TU\u00a0/\u00a0Total TU" : "Sum TU";
+    var tbl = document.createElement("table"); tbl.className="ch7-tbl";
     tbl.innerHTML =
-      "<thead><tr><th>Scoping</th><th class='r'>Adressen</th><th class='r'>Sum TU</th></tr></thead>" +
-      "<tfoot><tr><td>Total</td><td class='r'>"+totalN.toLocaleString("de")+
-      "</td><td class='r'>"+Math.round(totalTU).toLocaleString("de")+"</td></tr></tfoot>";
-    const tb = document.createElement("tbody");
-    sorted.forEach(row => {
-      const isNA   = row.cat === "NA / leer";
-      const isZero = row.n === 0 && row.sum_tu === 0;
-      const tr = document.createElement("tr");
+      "<thead><tr><th>Scoping</th><th class='r' style='white-space:normal;min-width:100px;line-height:1.3'>"+adrHead+"</th><th class='r' style='white-space:normal;min-width:100px;line-height:1.3'>"+tuHead+"</th></tr></thead>" +
+      "<tfoot><tr><td>Total</td><td class='r'>"+adrFoot+
+      "</td><td class='r'>"+tuFoot+"</td></tr></tfoot>";
+    var tb = document.createElement("tbody");
+sorted.forEach(function(row) {
+      var isNA   = row.cat === "NA / leer";
+      var isZero = row.n === 0 && row.sum_tu === 0;
+      var tr = document.createElement("tr");
       if (isNA && isZero) tr.className = "na-grey";
       else if (isNA)      tr.className = "na-red";
+      var adrCell = hasBaulos
+        ? ((row.nBaulos||0) + "\u00a0/\u00a0" + row.n.toLocaleString("de"))
+        : row.n.toLocaleString("de");
+      var tuCell = hasBaulos
+        ? (Math.round(row.sum_tu_baulos||0).toLocaleString("de") + "\u00a0/\u00a0" + Math.round(row.sum_tu).toLocaleString("de"))
+        : Math.round(row.sum_tu).toLocaleString("de");
       tr.innerHTML = "<td>"+row.cat+"</td>" +
-        "<td class='r'>"+row.n.toLocaleString("de")+"</td>" +
-        "<td class='r'>"+Math.round(row.sum_tu).toLocaleString("de")+"</td>";
+        "<td class='r'>"+adrCell+"</td>" +
+        "<td class='r'>"+tuCell+"</td>";
       tb.appendChild(tr);
     });
     tbl.insertBefore(tb, tbl.querySelector("tfoot"));
@@ -2774,127 +2895,109 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
   }
 
   function renderCards() {
-    const grid = document.getElementById("ch7g");
-    const wait = document.getElementById("ch7w");
-    const bnr  = document.getElementById("ch7b");
-    const iw   = document.getElementById("ch7-info-wrap");
-
+    var grid = document.getElementById("ch7g");
+    var wait = document.getElementById("ch7w");
+    var bnr  = document.getElementById("ch7b");
+    var iw   = document.getElementById("ch7-info-wrap");
     if (!selected.length) {
       grid.style.display="none"; wait.style.display="block";
       bnr.style.display="none"; iw.style.display="none"; return;
     }
     wait.style.display="none"; grid.style.display="grid";
-
-    const parts = [];
+    var parts = [];
     if (selBaulos) parts.push("Baulos: \u201e"+selBaulos+"\u201c");
     if (selFD.length) parts.push("FeederDrop: "+selFD.join(", "));
     bnr.style.display = parts.length ? "block" : "none";
     if (parts.length) bnr.textContent = "\u2139\ufe0f  Filter aktiv \u2014 "+parts.join(" | ")+(selBaulos?" \u2014 Anzahl zeigt Baulos\u00a0/\u00a0Gesamt":"");
 
     iw.style.display = "block"; iw.innerHTML = "";
-    const infoCard = document.createElement("div"); infoCard.className="ch7-card ch7-info-card";
-    const infoHdr = document.createElement("div"); infoHdr.className="ch7-card-hdr";
+    var infoCard = document.createElement("div"); infoCard.className="ch7-card ch7-info-card";
+    var infoHdr  = document.createElement("div"); infoHdr.className="ch7-card-hdr";
 
-    const allProjectRows = () => {
-      const seen = new Set();
-      const out  = [];
-      for (const arr of [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail,
-                         DATA.feeder_no_lr_detail, DATA.hp_missing_detail]) {
-        arr.filter(r => selected.includes(r["Planned by"])).forEach(r => {
+    function allProjectRows() {
+      var seen = new Set(); var out = [];
+      [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail, DATA.feeder_no_lr_detail, DATA.hp_missing_detail].forEach(function(arr) {
+        arr.filter(function(r) { return selected.includes(r["Planned by"]); }).forEach(function(r) {
           if (!seen.has(r["External ID"])) {
             seen.add(r["External ID"]);
-            const o = Object.assign({}, r);
-            delete o.category; delete o.baulos_name;
-            out.push(o);
+            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; out.push(o);
           }
         });
-      }
+      });
       return out;
-    };
-    const filteredProjectRows = () => {
-      const seen = new Set();
-      const out  = [];
-      for (const arr of [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail,
-                         DATA.feeder_no_lr_detail, DATA.hp_missing_detail]) {
-        applyFD(arr.filter(r =>
-          selected.includes(r["Planned by"]) && (!selBaulos || r.baulos_name === selBaulos)
-        )).forEach(r => {
+    }
+    function filteredProjectRows() {
+      var seen = new Set(); var out = [];
+      [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail, DATA.feeder_no_lr_detail, DATA.hp_missing_detail].forEach(function(arr) {
+        applyFD(arr.filter(function(r) { return selected.includes(r["Planned by"]) && (!selBaulos || r.baulos_name === selBaulos); })).forEach(function(r) {
           if (!seen.has(r["External ID"])) {
             seen.add(r["External ID"]);
-            const o = Object.assign({}, r);
-            delete o.category; delete o.baulos_name;
-            out.push(o);
+            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; out.push(o);
           }
         });
-      }
+      });
       return out;
-    };
+    }
 
-    const btnWrap = document.createElement("div");
+    var btnWrap = document.createElement("div");
     btnWrap.style.cssText = "display:flex;gap:6px;align-items:center;";
-    const btnAll = document.createElement("button"); btnAll.className="ch7-card-dl";
+    var btnAll = document.createElement("button"); btnAll.className="ch7-card-dl";
     btnAll.textContent = "\u2b07 Alle";
-    btnAll.title = "Alle Infopoints dieses Projekts (ohne Filter)";
-    btnAll.onclick = () => dlCSV(allProjectRows(), "infopoints_alle_"+fileSuffix()+".csv");
-    const btnFil = document.createElement("button"); btnFil.className="ch7-card-dl";
+    btnAll.onclick = function() { dlCSV(allProjectRows(), "infopoints_alle_"+fileSuffix()+".csv"); };
+    var btnFil = document.createElement("button"); btnFil.className="ch7-card-dl";
     btnFil.textContent = "\u2b07 Gefiltert";
-    btnFil.title = "Infopoints mit aktiven Filtern (Baulos / FeederDrop)";
-    btnFil.onclick = () => dlCSV(filteredProjectRows(), "infopoints_gefiltert_"+fileSuffix()+".csv");
+    btnFil.onclick = function() { dlCSV(filteredProjectRows(), "infopoints_gefiltert_"+fileSuffix()+".csv"); };
 
     infoHdr.innerHTML = "<span>Info</span>";
     btnWrap.appendChild(btnAll); btnWrap.appendChild(btnFil);
     infoHdr.appendChild(btnWrap);
     infoCard.appendChild(infoHdr);
 
-    const pir = DATA.info.filter(r => selected.includes(r["Planned by"]));
+    var pir = DATA.info.filter(function(r) { return selected.includes(r["Planned by"]); });
     if (selected.length === 1 && pir.length > 0) {
-      const r = pir[0];
-      const tbl = document.createElement("table"); tbl.className="ch7-info-tbl";
-      [["PCM", r.PCM||"\u2014"],
-       ["Status (Bau/Planung)", r.Bau_Planung||"\u2014"],
-       ["Ende Bau passiv/Plan", r.ende_bau_passiv_plan||"\u2014"]
-      ].forEach(([lbl,val]) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = "<td>"+lbl+"</td><td>"+val+"</td>";
-        tbl.appendChild(tr);
+      var r = pir[0];
+      var itbl = document.createElement("table"); itbl.className="ch7-info-tbl";
+      [["PCM", r.PCM||"\u2014"],["Status (Bau/Planung)", r.Bau_Planung||"\u2014"],["Ende Bau passiv/Plan", r.ende_bau_passiv_plan||"\u2014"]].forEach(function(pair) {
+        var tr = document.createElement("tr");
+        tr.innerHTML = "<td>"+pair[0]+"</td><td>"+pair[1]+"</td>";
+        itbl.appendChild(tr);
       });
-      infoCard.appendChild(tbl);
+      infoCard.appendChild(itbl);
     } else {
-      const note = document.createElement("div"); note.className="ch7-info-multi";
+      var note = document.createElement("div"); note.className="ch7-info-multi";
       note.textContent = selected.length+" Projekte ausgewählt — Info wird nur für Einzelprojekte angezeigt.";
       infoCard.appendChild(note);
     }
     iw.appendChild(infoCard);
 
     grid.innerHTML = "";
-    CARDS.forEach(def => {
-      const card = document.createElement("div"); card.className = def.isFttx ? "ch7-card fttx-card" : "ch7-card";
-      const hdr  = document.createElement("div");
-      hdr.className = def.isFttx ? "ch7-card-hdr fttx" : "ch7-card-hdr";
-      const titleSpan = document.createElement("span"); titleSpan.textContent = def.title;
+    CARDS.forEach(function(def) {
+      var card = document.createElement("div"); card.className = def.isFttx ? "ch7-card fttx-card" : "ch7-card";
+      var hdr  = document.createElement("div"); hdr.className = def.isFttx ? "ch7-card-hdr fttx" : "ch7-card-hdr";
+      var titleSpan = document.createElement("span"); titleSpan.textContent = def.title;
       hdr.appendChild(titleSpan);
-
       if (!def.isFttx) {
-        const dlBtn = document.createElement("button"); dlBtn.className="ch7-card-dl";
+        var dlBtn = document.createElement("button"); dlBtn.className="ch7-card-dl";
         dlBtn.textContent = "\u2b07 Download";
-        dlBtn.onclick = () => {
-          const rows = applyFD(def.detail.filter(r =>
-            selected.includes(r["Planned by"]) && (!selBaulos || r.baulos_name === selBaulos)
-          )).map(r => { const o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
-          dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
-        };
+        (function(def) {
+          dlBtn.onclick = function() {
+            var rows = applyFD(def.detail.filter(function(r) {
+              return selected.includes(r["Planned by"]) && (!selBaulos || r.baulos_name === selBaulos);
+            })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+            dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
+          };
+        })(def);
         hdr.appendChild(dlBtn);
       }
-
       card.appendChild(hdr);
-      card.appendChild(def.isFttx
-        ? buildFttxTable(def.agg())
-        : buildTable(def.agg(), def.detail, def.col, def.prefix, def.order));
+      card.appendChild(def.isFttx ? buildFttxTable(def.agg()) : buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false));
       grid.appendChild(card);
     });
   }
 
   buildPCMList();
+  buildPBList();
+  buildBPList();
   buildList();
   buildBaulosList();
 })();
@@ -2937,6 +3040,8 @@ Projekte, die im Bericht berücksichtigt werden (ohne "on hold").
 ```{r active-projects-table}
 project_list_full %>%
   filter(`Bau/Planung` != "on hold") %>%
+  select(-any_of(c("project_id_ods", "project_id_mer", "lr_abschluss_prio", "Kommentar"))) %>%
+  relocate(PB_HP_dahinter, .before = PCM) %>%
   reactable(
     filterable      = TRUE,
     sortable        = TRUE,
@@ -2956,6 +3061,8 @@ project_list_full %>%
 ```{r on-hold-projects-table}
 project_list_full %>%
   filter(`Bau/Planung` == "on hold") %>%
+  select(-any_of(c("project_id_ods", "project_id_mer", "lr_abschluss_prio", "Kommentar"))) %>%
+  relocate(PB_HP_dahinter, .before = PCM) %>%
   reactable(
     filterable      = TRUE,
     sortable        = TRUE,
