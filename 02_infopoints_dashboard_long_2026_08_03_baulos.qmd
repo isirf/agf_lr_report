@@ -29,6 +29,7 @@ base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_i
 input_path = paste0(base_path, "input_files/")
 
 # ↓↓↓ update these for every new export ↓↓↓
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_07_27.csv"
 infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_03.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "LR_Report_Gemeinden_2027_07_27.xlsx"
@@ -40,23 +41,17 @@ baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_08_04.csv"
 fttx_path                = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/"
 
 infopoints_path          = paste0(input_path, infopoints_file)
+infopoints_prev_path     = paste0(input_path, infopoints_file_prev)
 infopoints_enriched_path = paste0(input_path, infopoints_enriched_file)
 excel_path               = paste0(input_path, excel_file)
 
-# export date parsed from infopoints_file's name (format: ..._YYYY_MM_DD,
-# optionally followed by .csv or a same-day suffix like _evening). matched
-# anywhere in the string rather than anchored to the end, since the exact
-# trailing text varies (.csv extension, _evening, etc.).
+# export date parsed from infopoints_file's name
 infopoints_export_date = infopoints_file %>%
   str_extract("\\d{4}_\\d{2}_\\d{2}") %>%
   str_replace_all("_", "-")
 if (is.na(infopoints_export_date)) infopoints_export_date = "unbekannt"
 
-# weekly org-wide status trend summary for kapitel 6, sheet "Statusentwicklung"
-# (already excludes on-hold projects — see the sheet's own title cell).
-# columns: datum (text, e.g. "KW 06"), abgelehnt, angesucht, erhalten, offen,
-# storniert, no response. one row per week, starting row 3 (header row 2).
-lr_status_history_path = paste0(base_path, "input_files/lr_report_pia/LR-Statusentwicklung_piha_neu.xlsx")
+lr_status_history_path = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting LR;SN/LR-Statusentwicklung_piha_neu.xlsx"
 
 # fail fast with a clear message rather than a cryptic read_csv2 error
 all_input_files = c(infopoints_path, infopoints_enriched_path, excel_path, lr_status_history_path)
@@ -112,25 +107,14 @@ infopoints = infopoints %>%
       as.numeric()
   )
 
-# join spatial enrichment (from preprocessing.R)
-# note (2026-07): built_trasses, trasse_count, trasse_length_m, and
-# length_without_permission_m are currently unused — section 6.6, the only
-# consumer of this data, is commented out pending verification of how
-# preprocessing.R aggregates trasse rows per infopoint (possible 1:many
-# relationship would double-count meters — see note at old section 6.6).
-# re-enable the columns below alongside that section once resolved.
+# join spatial enrichment
 infopoints_enriched_cols = read_csv2(infopoints_enriched_path, name_repair = "minimal") %>%
-  select(`External ID`
-         # , built_trasses, trasse_count,
-         # trasse_length_m, length_without_permission_m
-         )
+  select(`External ID`)
 
 infopoints = infopoints %>%
   left_join(infopoints_enriched_cols, by = "External ID")
 
-# baulos lookup (pre-computed by preprocessing_baulos.R)
-# run preprocessing_baulos.R once whenever the geojson or infopoints csv
-# changes. that script does the spatial intersection and writes baulos_lookup.csv.
+# baulos lookup
 baulos_lookup_path = paste0(input_path, baulos_lookup_file)
 
 if (file.exists(baulos_lookup_path)) {
@@ -143,7 +127,6 @@ if (file.exists(baulos_lookup_path)) {
                          baulos_name   = character())
 }
 
-# per-project list of distinct baulos names (for the js dropdown)
 pp_baulos_by_project = baulos_lookup %>%
   distinct(`Planned by`, baulos_name) %>%
   arrange(`Planned by`, baulos_name)
@@ -156,13 +139,8 @@ SCOPING_LEVELS = c("In Scope", "Outside Build Scope", "Non Connectable", "NA / l
 
 if (file.exists(fttx_full_path)) {
   fttx_raw = read_csv2(fttx_full_path, name_repair = "unique", show_col_types = FALSE)
-
-  # select only the columns we need before renaming — avoids issues with
-  # duplicate or empty column names in the raw export
   fttx_raw = fttx_raw %>%
     select(`External ID`, `POP cluster`, Scoping, `Planned TU`, Latitude, Longitude)
-
-  # normalise: replace na/empty scoping with label, coerce planned tu to numeric
   fttx = fttx_raw %>%
     rename(`Planned by` = `POP cluster`) %>%
     filter(!is.na(`Planned by`) & `Planned by` != "") %>%
@@ -174,8 +152,6 @@ if (file.exists(fttx_full_path)) {
                        str_replace(as.character(`Planned TU`), ",", ".")
                      ))
     )
-
-  # baulos lookup for fttx (produced by preprocessing_baulos.R)
   if (file.exists(baulos_fttx_path)) {
     baulos_lookup_fttx = read_csv(baulos_fttx_path, show_col_types = FALSE) %>%
       rename(`Planned by` = `POP cluster`)
@@ -185,10 +161,8 @@ if (file.exists(fttx_full_path)) {
                                 `Planned by`  = character(),
                                 baulos_name   = character())
   }
-
   fttx = fttx %>%
     left_join(baulos_lookup_fttx %>% select(`External ID`, baulos_name), by = "External ID")
-
 } else {
   warning("fttx file not found — fttx card will be empty.")
   fttx = tibble(`External ID` = character(), `Planned by` = character(),
@@ -196,15 +170,24 @@ if (file.exists(fttx_full_path)) {
                 baulos_name = character())
 }
 
+# load previous week's infopoints for kpi trend arrows
+if (file.exists(infopoints_prev_path)) {
+  infopoints_all_prev = read_csv2(infopoints_prev_path, name_repair = "minimal") %>%
+    select(-last_col()) %>%
+    mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
+  infopoints_prev = infopoints_all_prev %>%
+    filter(`Planned by` %in% meilenstein_projects) %>%
+    left_join(project_list, by = "Planned by") %>%
+    filter(is.na(Status) | str_to_lower(str_trim(Status)) != "canceled")
+} else {
+  warning("previous week infopoints file not found — trend arrows will be hidden.")
+  infopoints_prev = NULL
+}
+
 n_total_all           = nrow(infopoints_all)
 n_total_active        = nrow(infopoints_active)
 n_canceled            = nrow(infopoints_active) - nrow(infopoints)
-n_total               = nrow(infopoints)   # non-canceled active
-# note (2026-07): n_projects_all previously counted distinct "planned by"
-# strings found in the raw infopoints csv — this could diverge from the
-# actual project list (typos, stale names, projects with 0 infopoints so
-# far) and did not match the excel's own count of active projects. fixed to
-# count directly from the excel project list, the source of truth.
+n_total               = nrow(infopoints)
 n_projects_all        = project_list_full %>%
   filter(`Bau/Planung` != "on hold") %>%
   distinct(Gemeinden) %>%
@@ -244,6 +227,28 @@ add_pct_cols = function(df, pct_base) {
   result
 }
 
+# trend arrow helper for kpi boxes
+# direction: "up_good"   = green when up, red when down (e.g. receive)
+#            "down_good" = red when up, green when down (e.g. open, rejected)
+trend_arrow = function(current, previous, direction = "down_good") {
+  if (is.null(previous) || is.na(previous) || is.na(current) || previous == current) return(NULL)
+  diff      = current - previous
+  pct_val   = if (previous == 0) NA else round(100 * abs(diff) / previous, 1)
+  arrow     = if (diff > 0) "\u2191" else "\u2193"
+  pct_label = if (is.na(pct_val)) "" else paste0(pct_val, "%")
+  is_up     = diff > 0
+  color = if (direction == "up_good") {
+    if (is_up) "#5B7E3C" else "#C44A3A"
+  } else {
+    if (is_up) "#C44A3A" else "#5B7E3C"
+  }
+tags$span(
+    style = paste0("font-size:0.58em;color:", color,
+                   ";white-space:nowrap;float:right;margin-left:8px;margin-top:6px;"),
+    arrow, "\u00a0", pct_label
+  )
+}
+
 rt = function(df, title = NULL,
               highlight_rows  = NULL,
               highlight_bg    = "#fff3cd",
@@ -253,10 +258,8 @@ rt = function(df, title = NULL,
   data_rows = df %>% filter(.data[[label_col]] != "Total")
   total_row = df %>% filter(.data[[label_col]] == "Total")
   has_total = nrow(total_row) > 0
-
   pct_cols = names(df)[str_detect(names(df), "%$")]
   num_cols = names(df)[sapply(df, is.numeric)]
-
   make_footer = function(col) {
     if (!has_total) return(NULL)
     val = total_row[[col]]
@@ -266,7 +269,6 @@ rt = function(df, title = NULL,
       function(values, name) tags$b(as.character(val), style = "color:#fff;")
     }
   }
-
   col_defs = lapply(names(df), function(col) {
     if (col %in% pct_cols) {
       colDef(name = col, align = "right", minWidth = 70,
@@ -281,15 +283,13 @@ rt = function(df, title = NULL,
     }
   })
   names(col_defs) = names(df)
-
   flagged_amber = highlight_rows
   flagged_red   = if (na_leer_row && label_col == "Status") "NA / leer" else NULL
-
   row_style_fn = if (!is.null(flagged_amber) || !is.null(flagged_red)) {
-    bg_a  = highlight_bg;    fg_a = highlight_color
-    bg_r  = "#fde8e8";       fg_r = "#c0392b"
-    lbl   = label_col
-    fa    = flagged_amber;   fr   = flagged_red
+    bg_a = highlight_bg; fg_a = highlight_color
+    bg_r = "#fde8e8";    fg_r = "#c0392b"
+    lbl  = label_col
+    fa   = flagged_amber; fr = flagged_red
     function(index) {
       val = data_rows[[lbl]][index]
       if (!is.null(fr) && val %in% fr)
@@ -301,7 +301,6 @@ rt = function(df, title = NULL,
       else list()
     }
   } else NULL
-
   tbl = reactable(
     data_rows,
     columns         = col_defs,
@@ -313,12 +312,11 @@ rt = function(df, title = NULL,
     bordered        = TRUE,
     defaultPageSize = 25,
     theme = reactableTheme(
-      headerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
+      headerStyle  = list(background = "#133458", color = "white", fontWeight = "bold"),
       stripedColor = "#f8f9fa",
-      footerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold")
+      footerStyle  = list(background = "#133458", color = "white", fontWeight = "bold")
     )
   )
-
   tagList(
     if (!is.null(title)) tags$p(tags$strong(title), style = "margin-bottom:4px; font-size:1.05em;"),
     tbl
@@ -326,7 +324,6 @@ rt = function(df, title = NULL,
 }
 
 na_status_callout = function(df, col = "Status") {
-  # accepts either a pre-grouped summary (with Total col) or raw infopoints
   if (!("Total" %in% names(df))) {
     df = df %>%
       na_label(col) %>%
@@ -357,21 +354,18 @@ download_btn = function(summary_df, raw_df, filename_summary, filename_raw) {
     encoded = base64enc::base64encode(charToRaw(csv_text))
     paste0("data:text/csv;base64,", encoded)
   }
-
   uri_summary = make_csv_uri(summary_df)
   uri_raw     = make_csv_uri(raw_df)
-
   btn_style = paste0(
     "display:inline-block; margin:4px 6px 12px 0;",
     "padding:5px 12px; font-size:0.8em; border-radius:4px;",
     "border:none; cursor:pointer; text-decoration:none; color:white;"
   )
-
   tagList(
     tags$a(href = uri_summary, download = filename_summary,
-           style = paste0(btn_style, "background:#2c3e50;"), "⬇ Tabelle (CSV)"),
+           style = paste0(btn_style, "background:#133458;"), "⬇ Tabelle (CSV)"),
     tags$a(href = uri_raw,     download = filename_raw,
-           style = paste0(btn_style, "background:#18bc9c;"), "⬇ Rohdaten (CSV)")
+           style = paste0(btn_style, "background:#838921;"), "⬇ Rohdaten (CSV)")
   )
 }
 ```
@@ -433,8 +427,8 @@ main#quarto-document-content {
   margin-bottom: -2px;
 }
 .panel-tabset [role="tablist"] [role="tab"][aria-selected="true"] {
-  border-bottom: 3px solid #2c3e50;
-  color: #2c3e50;
+  border-bottom: 3px solid #133458;
+  color: #133458;
   font-weight: bold;
 }
 
@@ -461,20 +455,23 @@ main#quarto-document-content {
 .kpi-box {
   background: #f8f9fa;
   border: 1px solid #dee2e6;
-  border-left: 4px solid #2c3e50;
+  border-left: 4px solid #133458;
   border-radius: 6px;
   padding: 12px 18px;
   min-width: 160px;
   flex: 1 1 160px;
 }
-.kpi-box.warn  { border-left-color: #e67e22; }
-.kpi-box.ok    { border-left-color: #18bc9c; }
-.kpi-box .kpi-val  { font-size: 1.7em; font-weight: bold; color: #2c3e50; line-height: 1.1; }
-.kpi-box.warn .kpi-val { color: #e67e22; }
-.kpi-box.ok   .kpi-val { color: #18bc9c; }
+.kpi-box.warn  { border-left-color: #D99B21; }
+.kpi-box.ok    { border-left-color: #838921; }
+.kpi-box .kpi-val  { font-size: 1.7em; font-weight: bold; color: #133458; line-height: 1.1; }
+.kpi-box.warn .kpi-val { color: #D99B21; }
+.kpi-box.ok   .kpi-val { color: #838921; }
 .kpi-box .kpi-lbl  { font-size: 0.78em; color: #666; margin-top: 4px; }
 .kpi-box .kpi-pct  { font-size: 0.78em; color: #666; margin-top: 2px; }
 .kpi-box.gesamt .kpi-lbl { font-weight: 700; color: #444; }
+.kpi-box.grayed { border-left-color: #dee2e6; }
+.kpi-box.grayed .kpi-val { color: #bbb; }
+.kpi-box.grayed .kpi-lbl { color: #ccc; }
 .kpi-divider {
   width: 2px;
   min-width: 2px;
@@ -492,32 +489,17 @@ main#quarto-document-content {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #2c3e50;
+  color: #133458;
   margin-bottom: 6px;
   padding-left: 2px;
   border-bottom: 1px solid #dee2e6;
   padding-bottom: 3px;
 }
 
-/* ---- toggle button ---- */
-#toggle-btn {
-  position: fixed;
-  top: 12px;
-  right: 20px;
-  z-index: 9999;
-  background: #2c3e50;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-size: 0.85em;
-  cursor: pointer;
-}
-#toggle-btn:hover { background: #1a252f; }
 
 /* ---- collapsible sections ---- */
 .section-toggle { cursor: pointer; user-select: none; }
-.section-toggle::before { content: "▾ "; font-size: 0.9em; color: #2c3e50; }
+.section-toggle::before { content: "▾ "; font-size: 0.9em; color: #133458; }
 .section-toggle.collapsed::before { content: "▸ "; }
 .section-body { overflow: hidden; transition: max-height 0.3s ease; }
 .section-body.collapsed { max-height: 0 !important; }
@@ -530,22 +512,7 @@ h4 { margin-top: 1.8em !important; margin-bottom: 0.5em !important; }
 hr { margin-top: 2em !important; margin-bottom: 2em !important; }
 </style>
 
-<button id="toggle-btn" onclick="toggleAll()">Alles einklappen</button>
-
 <script>
-let allCollapsed = false;
-
-function toggleAll() {
-  allCollapsed = !allCollapsed;
-  document.querySelectorAll('.section-body').forEach(el => {
-    el.classList.toggle('collapsed', allCollapsed);
-  });
-  document.querySelectorAll('.section-toggle').forEach(el => {
-    el.classList.toggle('collapsed', allCollapsed);
-  });
-  document.getElementById('toggle-btn').textContent =
-    allCollapsed ? 'Alles ausklappen' : 'Alles einklappen';
-}
 
 document.addEventListener('DOMContentLoaded', function() {
   const content = document.querySelector('.page-columns') ||
@@ -592,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
 ```{r dynamic-title, results='asis'}
 # inject the report title with the infopoints export date into the html
 cat(sprintf(
-  '<h1 style="margin-top:1em; color:#2c3e50;">Infopoints — Data Quality Check <small style="font-size:0.55em; color:#888; font-weight:400;">Datenstand: %s</small></h1>',
+  '<h1 style="margin-top:1em; color:#133458;">Infopoints — Data Quality Check <small style="font-size:0.55em; color:#888; font-weight:400;">Datenstand: %s</small></h1>',
   infopoints_export_date
 ))
 ```
@@ -700,25 +667,50 @@ n_feeder_built_no_lr_im_bau     = infopoints %>%
 n_feeder_built_no_lr_bau_fertig = infopoints %>%
   filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
          built == "Yes" & Bau_Planung == "Bau fertig") %>% nrow()
+
+
+# previous week comparison values for trend arrows
+if (!is.null(infopoints_prev)) {
+  prev_n_total            = nrow(infopoints_prev)
+  prev_status_receive     = sum(infopoints_prev$Status == "receive",     na.rm = TRUE)
+  prev_status_open        = sum(infopoints_prev$Status == "open",        na.rm = TRUE)
+  prev_status_applied     = sum(infopoints_prev$Status == "applied for", na.rm = TRUE)
+  prev_status_rejected    = sum(infopoints_prev$Status == "rejected",    na.rm = TRUE)
+  prev_status_no_resp     = sum(str_to_lower(str_trim(infopoints_prev$Status)) == "no response", na.rm = TRUE)
+  prev_status_na          = sum(is.na(infopoints_prev$Status) | infopoints_prev$Status == "")
+  prev_built_no_receive   = infopoints_prev %>%
+    filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>% nrow()
+  prev_feeder_no_lr       = infopoints_prev %>%
+    filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive")) %>% nrow()
+  prev_feeder_built_no_lr = infopoints_prev %>%
+    filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+           built == "Yes") %>% nrow()
+} else {
+  prev_n_total = prev_status_receive = prev_status_open = prev_status_applied =
+  prev_status_rejected = prev_status_no_resp = prev_status_na =
+  prev_built_no_receive = prev_feeder_no_lr = prev_feeder_built_no_lr = NA
+}
+
+
 ```
 
 ```{r exec-kpi-boxes}
-kpi_box = function(val, lbl, cls = "") {
+kpi_box = function(val, lbl, cls = "", trend = NULL) {
   tags$div(class = paste("kpi-box", cls),
-    tags$div(class = "kpi-val", val),
+    tags$div(class = "kpi-val", val, trend),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
-kpi_box_status = function(n, pct_val, lbl, cls = "") {
+kpi_box_status = function(n, pct_val, lbl, cls = "", trend = NULL) {
   tags$div(class = paste("kpi-box", cls),
-    tags$div(class = "kpi-val", n),
+    tags$div(class = "kpi-val", n, trend),
     tags$div(class = "kpi-pct", paste0(pct_val, "%")),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
-kpi_box_gesamt = function(val, lbl, cls = "") {
+kpi_box_gesamt = function(val, lbl, cls = "", trend = NULL) {
   tags$div(class = paste("kpi-box gesamt", cls),
-    tags$div(class = "kpi-val", val),
+    tags$div(class = "kpi-val", val, trend),
     tags$div(class = "kpi-lbl", lbl)
   )
 }
@@ -732,58 +724,61 @@ kpi_group = function(label, ...) {
 }
 
 tagList(
-  kpi_group("Datenbestand",
-    kpi_box(n_total_all,
-            "Infopoints gesamt (alle Projekte inkl. on hold)"),
-    kpi_box(n_total_active,
-            paste0("In aktiven Projekten — ohne on hold (", n_projects_all, " Projekten)")),
-    kpi_box(n_canceled,
-            paste0("Davon storniert (", round(100 * n_canceled / n_total_active, 1), "% der aktiven inkl. storniert)"),
-            "warn"),
+  kpi_group("Datengrundlage / Anzahl an Infopoints",
     kpi_box(n_total,
             paste0("Analyse-Basis: aktiv & nicht storniert (", round(100 * n_total / n_total_active, 1), "% der aktiven inkl. storniert)"),
-            "ok")
+            "ok",
+            trend = trend_arrow(n_total, prev_n_total, "up_good")),
+    kpi_divider(),
+    kpi_box(n_total_all,
+            "Infopoints gesamt (alle Projekte inkl. on hold)",
+            "grayed"),
+    kpi_box(n_total_active,
+            paste0("In aktiven Projekten — ohne on hold (", n_projects_all, " Projekten)"),
+            "grayed"),
+    kpi_box(n_canceled,
+            paste0("Davon storniert (", round(100 * n_canceled / n_total_active, 1), "% der aktiven inkl. storniert)"),
+            "grayed")
   ),
 
   kpi_group("Infopunkte je Status",
     kpi_box_status(n_status_receive,
-                   round(100 * n_status_receive     / n_total, 1),
-                   "receive"),
+                   round(100 * n_status_receive / n_total, 1),
+                   "receive",
+                   trend = trend_arrow(n_status_receive, prev_status_receive, "up_good")),
     kpi_box_status(n_status_open,
-                   round(100 * n_status_open        / n_total, 1),
-                   "open"),
+                   round(100 * n_status_open / n_total, 1),
+                   "open",
+                   trend = trend_arrow(n_status_open, prev_status_open, "down_good")),
     kpi_box_status(n_status_applied,
-                   round(100 * n_status_applied     / n_total, 1),
+                   round(100 * n_status_applied / n_total, 1),
                    paste0("applied for — davon ", n_applied_over12w,
                           " (", round(100 * n_applied_over12w / max(n_applied_for, 1), 1),
-                          "%) > 12 Wochen offen")),
+                          "%) > 12 Wochen offen"),
+                   trend = trend_arrow(n_status_applied, prev_status_applied, "down_good")),
     kpi_box_status(n_status_rejected,
-                   round(100 * n_status_rejected    / n_total, 1),
-                   "rejected",    "warn"),
+                   round(100 * n_status_rejected / n_total, 1),
+                   "rejected", "warn",
+                   trend = trend_arrow(n_status_rejected, prev_status_rejected, "down_good")),
     kpi_box_status(n_status_no_response,
                    round(100 * n_status_no_response / n_total, 1),
-                   "no response", "warn"),
+                   "no response", "warn",
+                   trend = trend_arrow(n_status_no_response, prev_status_no_resp, "down_good")),
     kpi_box_status(n_status_na,
-                   round(100 * n_status_na          / n_total, 1),
-                   "NA / leer",   "warn")
-  ),
-
-  kpi_group("Datenqualität",
-    kpi_box(n_hp_leer_exec,
-            paste0("HP behind fehlt (", round(100 * n_hp_leer_exec / n_total, 1), "% ohne storniert)"),
-            "warn"),
-    kpi_box(n_missing_all_parcel,
-            paste0("Alle 3 Katasterfelder fehlen (", round(100 * n_missing_all_parcel / n_total, 1), "% ohne storniert)"),
-            "warn")
+                   round(100 * n_status_na / n_total, 1),
+                   "NA / leer", "warn",
+                   trend = trend_arrow(n_status_na, prev_status_na, "down_good"))
   ),
 
   kpi_group("Leitungsrechte",
     kpi_box(n_built_yes_no_receive,
             paste0("Gebaut, aber Status ≠ receive (", round(100 * n_built_yes_no_receive / n_total, 1), "% ohne storniert)"),
-            "warn"),
+            "warn",
+            trend = trend_arrow(n_built_yes_no_receive, prev_built_no_receive, "down_good")),
     kpi_divider(),
     kpi_box_gesamt(n_feeder_no_lr,
-                   "Feeder ohne LR (gesamt)", "warn"),
+                   "Feeder ohne LR (gesamt)", "warn",
+                   trend = trend_arrow(n_feeder_no_lr, prev_feeder_no_lr, "down_good")),
     kpi_box(n_feeder_no_lr_planung,
             "Feeder ohne LR — Planung", "warn"),
     kpi_box(n_feeder_no_lr_im_bau,
@@ -792,7 +787,8 @@ tagList(
             "Feeder ohne LR — Bau fertig", "warn"),
     kpi_divider(),
     kpi_box_gesamt(n_feeder_built_no_lr,
-                   "Feeder gebaut ohne LR (gesamt)", "warn"),
+                   "Feeder gebaut ohne LR (gesamt)", "warn",
+                   trend = trend_arrow(n_feeder_built_no_lr, prev_feeder_built_no_lr, "down_good")),
     kpi_box(n_feeder_built_no_lr_planung,
             "Feeder gebaut ohne LR — Planung", "warn"),
     kpi_box(n_feeder_built_no_lr_im_bau,
@@ -819,7 +815,7 @@ tagList(
 ```
 
 ::: {.callout-note}
-Alle Zahlen und Prozentangaben beziehen sich auf **`r n_total` aktive, nicht stornierte Infopoints** in `r n_projects_all` Projekten (ohne on hold). Ausgefiltert: `r n_canceled` storniert + `r n_total_all - n_total_active` in on hold Projekten.
+Alle Zahlen und Prozentangaben beziehen sich auf **`r n_total` aktive, nicht stornierte Infopoints** in `r n_projects_all` Projekten (ohne on hold). Ausgefiltert: `r n_canceled` storniert + `r n_total_all - n_total_active` in on hold Projekten. Die Prozentangaben zeigen die Veränderung zur Vorwoche.
 :::
 
 ---
@@ -864,14 +860,14 @@ reactable(
     `Planned by`  = colDef(name = "Projekt",     minWidth = 200,
                            footer = function(v, n) tags$b("", style="color:#fff")),
     Leer          = colDef(align = "right", minWidth = 60,
-                           style = function(v) if (!is.na(v) && v > 0) list(color = "#e67e22", fontWeight = "bold") else list(),
+                           style = function(v) if (!is.na(v) && v > 0) list(color = "#D99B21", fontWeight = "bold") else list(),
                            footer = function(v, n) tags$b(sum(status_overview$Leer[status_overview$Bau_Planung == "Total"], na.rm=TRUE), style="color:#fff")),
     open          = colDef(align = "right", minWidth = 60,
                            footer = function(v, n) tags$b(sum(status_overview$open[status_overview$Bau_Planung == "Total"], na.rm=TRUE), style="color:#fff")),
     `applied for` = colDef(align = "right", minWidth = 80,
                            footer = function(v, n) tags$b(sum(status_overview$`applied for`[status_overview$Bau_Planung == "Total"], na.rm=TRUE), style="color:#fff")),
     receive       = colDef(align = "right", minWidth = 70,
-                           style = function(v) if (!is.na(v) && v > 0) list(color = "#18bc9c", fontWeight = "bold") else list(),
+                           style = function(v) if (!is.na(v) && v > 0) list(color = "#838921", fontWeight = "bold") else list(),
                            footer = function(v, n) tags$b(sum(status_overview$receive[status_overview$Bau_Planung == "Total"], na.rm=TRUE), style="color:#fff")),
     rejected      = colDef(align = "right", minWidth = 70,
                            footer = function(v, n) tags$b(sum(status_overview$rejected[status_overview$Bau_Planung == "Total"], na.rm=TRUE), style="color:#fff")),
@@ -892,9 +888,9 @@ reactable(
   bordered        = TRUE,
   defaultPageSize = 30,
   theme = reactableTheme(
-    headerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
+    headerStyle  = list(background = "#133458", color = "white", fontWeight = "bold"),
     stripedColor = "#f8f9fa",
-    footerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold")
+    footerStyle  = list(background = "#133458", color = "white", fontWeight = "bold")
   )
 )
 ```
@@ -1498,10 +1494,10 @@ pacman::p_load(ggplot2)
 max_weeks = max(applied_for_dated$weeks_open, na.rm = TRUE)
 
 ggplot(applied_for_dated, aes(x = weeks_open)) +
-  geom_histogram(binwidth = 4, fill = "#2c3e50", color = "white", alpha = 0.85) +
-  geom_vline(xintercept = 12, color = "#e67e22", linewidth = 1, linetype = "dashed") +
+  geom_histogram(binwidth = 4, fill = "#133458", color = "white", alpha = 0.85) +
+  geom_vline(xintercept = 12, color = "#D99B21", linewidth = 1, linetype = "dashed") +
   annotate("text", x = 13, y = Inf, label = "12 Wochen\nSchwelle",
-           hjust = 0, vjust = 1.3, color = "#e67e22", size = 3.2) +
+           hjust = 0, vjust = 1.3, color = "#D99B21", size = 3.2) +
   scale_x_continuous(
     breaks = seq(0, ceiling(max_weeks / 4) * 4, by = 4),
     labels = function(x) paste0(x, "W")
@@ -1514,7 +1510,7 @@ ggplot(applied_for_dated, aes(x = weeks_open)) +
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+    plot.title       = element_text(face = "bold", color = "#133458"),
     plot.subtitle    = element_text(color = "#666"),
     panel.grid.minor = element_blank(),
     axis.text.x      = element_text(size = 9, angle = 0)
@@ -1622,10 +1618,10 @@ Maximaler Wert: **`r round(max(open_dated$weeks_open, na.rm = TRUE), 1)` Wochen*
 max_weeks_open = max(open_dated$weeks_open, na.rm = TRUE)
 
 ggplot(open_dated, aes(x = weeks_open)) +
-  geom_histogram(binwidth = 4, fill = "#2c3e50", color = "white", alpha = 0.85) +
-  geom_vline(xintercept = 12, color = "#e67e22", linewidth = 1, linetype = "dashed") +
+  geom_histogram(binwidth = 4, fill = "#133458", color = "white", alpha = 0.85) +
+  geom_vline(xintercept = 12, color = "#D99B21", linewidth = 1, linetype = "dashed") +
   annotate("text", x = 13, y = Inf, label = "12 Wochen\nSchwelle",
-           hjust = 0, vjust = 1.3, color = "#e67e22", size = 3.2) +
+           hjust = 0, vjust = 1.3, color = "#D99B21", size = 3.2) +
   scale_x_continuous(
     breaks = seq(0, ceiling(max_weeks_open / 4) * 4, by = 4),
     labels = function(x) paste0(x, "W")
@@ -1638,7 +1634,7 @@ ggplot(open_dated, aes(x = weeks_open)) +
   ) +
   theme_minimal(base_size = 12) +
   theme(
-    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+    plot.title       = element_text(face = "bold", color = "#133458"),
     plot.subtitle    = element_text(color = "#666"),
     panel.grid.minor = element_blank(),
     axis.text.x      = element_text(size = 9, angle = 0)
@@ -2003,38 +1999,52 @@ download_btn(
 
 Entwicklung der Infopoints je Status über die Zeit (wöchentlich), basierend
 auf der Zusammenfassung in `LR-Statusentwicklung_piha_neu.xlsx`
-(Tabellenblatt `Statusentwicklung`). Die Zahlen sind bereits um on-hold-
-Projekte bereinigt (siehe Titel des Tabellenblatts).
+(Tabellenblatt `Statusentwicklung`). On-hold Projekte wurden nicht einbezogen.
 
 ```{r lr-status-history-load}
 lr_status_history_raw = read_excel(
   lr_status_history_path,
-  sheet     = "Statusentwicklung",
-  skip      = 1,
-  col_names = TRUE
+  sheet     = "statusentwicklung_raw",
+  skip      = 0,
+  col_names = TRUE,
+  col_types = c("text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric")
 )
 
-# standardize column names by position — confirmed order: datum, abgelehnt,
-# angesucht, erhalten, offen, storniert, no response.
+# standardize column names by position
 names(lr_status_history_raw)[1:7] = c(
   "kw", "Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"
 )
 
 lr_status_history = lr_status_history_raw %>%
+  mutate(kw = str_trim(kw)) %>%
   filter(!is.na(kw) & kw != "") %>%
   mutate(across(c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response),
                 ~ suppressWarnings(as.numeric(.x)))) %>%
   mutate(kw_order = row_number())
 
+# auto-append current week from infopoints export
+current_kw_num   = as.integer(format(as.Date(infopoints_export_date), "%V"))
+current_kw_label = paste0("KW ", formatC(current_kw_num, width = 2, flag = "0"))
+
+if (!current_kw_label %in% lr_status_history$kw) {
+  current_row = infopoints %>%
+    summarise(
+      kw          = current_kw_label,
+      Abgelehnt   = sum(Status == "rejected",                                    na.rm = TRUE),
+      Angesucht   = sum(Status == "applied for",                                 na.rm = TRUE),
+      Erhalten    = sum(Status == "receive",                                     na.rm = TRUE),
+      Offen       = sum(Status == "open",                                        na.rm = TRUE),
+      Storniert   = nrow(infopoints_active) - nrow(infopoints),
+      No_Response = sum(str_to_lower(str_trim(Status)) == "no response",        na.rm = TRUE)
+    ) %>%
+    mutate(kw_order = max(lr_status_history$kw_order) + 1)
+
+  lr_status_history = bind_rows(lr_status_history, current_row)
+}
+
 n_lr_weeks = nrow(lr_status_history)
 ```
 
-::: {.callout-note}
-Datengrundlage: **`r n_lr_weeks` Kalenderwochen** aus `Statusentwicklung`
-(`r lr_status_history$kw[1]` bis `r lr_status_history$kw[n_lr_weeks]`). Zahlen
-beziehen sich bereits auf aktive (nicht on-hold) Projekte gesamt — keine
-Aufschlüsselung nach einzelnem Projekt in dieser Quelle verfügbar.
-:::
 
 ### 6.1 Entwicklung nach Status
 
@@ -2050,16 +2060,19 @@ lr_status_long = lr_status_history %>%
       levels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"),
       labels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No Response")
     ),
+    Status = factor(Status,
+      levels = c("Erhalten", "Storniert", "Offen", "Angesucht", "Abgelehnt", "No Response")
+    ),
     kw = factor(kw, levels = lr_status_history$kw)
   )
 
 status_colors = c(
   "Abgelehnt"   = "#c0392b",
-  "Angesucht"   = "#e67e22",
-  "Erhalten"    = "#18bc9c",
+  "Angesucht"   = "#D99B21",
+  "Erhalten"    = "#838921",
   "Offen"       = "#3498db",
   "Storniert"   = "#7f8c8d",
-  "No Response" = "#8e44ad"
+  "No Response" = "#574964"
 )
 
 lr_status_gg = ggplot(
@@ -2077,15 +2090,26 @@ lr_status_gg = ggplot(
     color = "Status"
   ) +
   theme_minimal(base_size = 12) +
-  theme(
-    plot.title       = element_text(face = "bold", color = "#2c3e50"),
+theme(
+    plot.title       = element_text(face = "bold", color = "#133458"),
     axis.text.x      = element_text(angle = 45, hjust = 1, size = 9),
     panel.grid.minor = element_blank(),
-    legend.position  = "bottom"
+    legend.position  = "right",
+    legend.text      = element_text(size = 9),
+    legend.key.size  = unit(0.8, "lines")
   )
 
 ggplotly(lr_status_gg, tooltip = "text") %>%
-  layout(legend = list(orientation = "h", y = -0.25))
+  layout(
+    legend = list(
+      orientation = "v",
+      x           = 1.02,
+      y           = 0.5,
+      xanchor     = "left",
+      yanchor     = "middle",
+      font        = list(size = 11)
+    )
+  )
 ```
 
 ---
@@ -2310,7 +2334,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 
 ```{=html}
 <style>
-.ch7-sel-label{font-size:.78em;font-weight:700;color:#2c3e50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:block}
+.ch7-sel-label{font-size:.78em;font-weight:700;color:#133458;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:block}
 .ch7-count{font-size:.78em;color:#888;margin-top:3px}
 .ch7-filters-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:16px;align-items:start}
 @media(max-width:900px){.ch7-filters-row{grid-template-columns:1fr}}
@@ -2319,26 +2343,26 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-proj-item{padding:6px 13px;cursor:pointer;border-bottom:1px solid #f2f2f2;font-size:.88em;transition:background .1s;user-select:none}
 .ch7-proj-item:last-child{border-bottom:none}
 .ch7-proj-item:hover{background:#f5f7f9}
-.ch7-proj-item.sel{background:#eef3f8;font-weight:600;color:#2c3e50}
+.ch7-proj-item.sel{background:#eef3f8;font-weight:600;color:#133458}
 .ch7-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
-.ch7-tag{background:#2c3e50;color:white;border-radius:20px;padding:3px 11px 3px 10px;font-size:.78em;display:flex;align-items:center;gap:5px}
+.ch7-tag{background:#133458;color:white;border-radius:20px;padding:3px 11px 3px 10px;font-size:.78em;display:flex;align-items:center;gap:5px}
 .ch7-tag button{background:none;border:none;color:rgba(255,255,255,.65);cursor:pointer;font-size:1.1em;line-height:1;padding:0}
 .ch7-tag button:hover{color:white}
 .ch7-search{width:100%;padding:7px 11px;border:1px solid #dee2e6;border-radius:5px;font-size:.88em;outline:none;transition:border-color .15s;box-sizing:border-box}
-.ch7-search:focus{border-color:#2c3e50}
-.ch7-filter-select{width:100%;padding:7px 11px;border:1px solid #dee2e6;border-radius:5px;font-size:.88em;outline:none;background:white;color:#2c3e50;transition:border-color .15s;box-sizing:border-box}
-.ch7-filter-select:focus{border-color:#2c3e50}
+.ch7-search:focus{border-color:#133458}
+.ch7-filter-select{width:100%;padding:7px 11px;border:1px solid #dee2e6;border-radius:5px;font-size:.88em;outline:none;background:white;color:#133458;transition:border-color .15s;box-sizing:border-box}
+.ch7-filter-select:focus{border-color:#133458}
 .ch7-filter-select:disabled{background:#f4f6f8;color:#aaa;cursor:not-allowed}
 .ch7-clear-btn{align-self:flex-start;margin-top:2px;background:none;border:1px solid #dee2e6;border-radius:5px;padding:5px 10px;font-size:.82em;cursor:pointer;color:#666;transition:background .1s;display:none}
 .ch7-clear-btn:hover{background:#f0f0f0}
 .ch7-fd-list{background:white;border:1px solid #dee2e6;border-radius:5px;padding:6px 4px;margin-top:2px}
 .ch7-fd-item{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:.88em;cursor:pointer;border-radius:4px;transition:background .1s}
 .ch7-fd-item:hover{background:#f5f7f9}
-.ch7-fd-item input{cursor:pointer;accent-color:#2c3e50}
-.ch7-banner{background:#eef4fb;border:1px solid #b8d4ea;border-radius:5px;padding:9px 14px;margin-bottom:16px;font-size:.84em;color:#2c3e50;display:none}
+.ch7-fd-item input{cursor:pointer;accent-color:#133458}
+.ch7-banner{background:#eef4fb;border:1px solid #b8d4ea;border-radius:5px;padding:9px 14px;margin-bottom:16px;font-size:.84em;color:#133458;display:none}
 .ch7-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;align-items:stretch}
 .ch7-card{background:white;border-radius:6px;border:1px solid #dee2e6;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;display:flex;flex-direction:column}
-.ch7-card-hdr{background:#2c3e50;color:white;padding:10px 15px;font-weight:600;font-size:.9em;display:flex;align-items:center;justify-content:space-between}
+.ch7-card-hdr{background:#133458;color:white;padding:10px 15px;font-weight:600;font-size:.9em;display:flex;align-items:center;justify-content:space-between}
 .ch7-card-dl{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:4px;color:white;cursor:pointer;font-size:.8em;padding:3px 8px;transition:background .15s;white-space:nowrap}
 .ch7-card-dl:hover{background:rgba(255,255,255,.28)}
 .ch7-tbl{width:100%;border-collapse:collapse;font-size:.88em;flex:1;display:flex;flex-direction:column}
@@ -2347,7 +2371,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-tbl tbody{flex:1}
 .ch7-tbl tfoot{margin-top:auto}
 .ch7-tbl thead tr{background:#f2f4f6;border-bottom:2px solid #dee2e6}
-.ch7-tbl thead th{padding:6px 11px;font-size:.76em;font-weight:700;color:#2c3e50;text-transform:uppercase;letter-spacing:.05em;text-align:left}
+.ch7-tbl thead th{padding:6px 11px;font-size:.76em;font-weight:700;color:#133458;text-transform:uppercase;letter-spacing:.05em;text-align:left}
 .ch7-tbl thead th.r{text-align:right}
 .ch7-tbl tbody tr{border-bottom:1px solid #f0f0f0;transition:background .1s}
 .ch7-tbl tbody tr:hover{background:#f8f9fa}
@@ -2359,8 +2383,8 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-tbl tbody tr.na-amber td{color:#856404;font-weight:600}
 .ch7-tbl tbody tr.na-amber td:first-child{border-left:3px solid #e6a817;padding-left:8px}
 .ch7-tbl tbody tr.na-green{background:#f0faf5}
-.ch7-tbl tbody tr.na-green td{color:#18bc9c;font-weight:600}
-.ch7-tbl tbody tr.na-green td:first-child{border-left:3px solid #18bc9c;padding-left:8px}.ch7-tbl td{padding:7px 11px}
+.ch7-tbl tbody tr.na-green td{color:#838921;font-weight:600}
+.ch7-tbl tbody tr.na-green td:first-child{border-left:3px solid #838921;padding-left:8px}.ch7-tbl td{padding:7px 11px}
 .ch7-tbl td.r{text-align:right;font-variant-numeric:tabular-nums}
 .ch7-tbl td.p{text-align:right;color:#888;font-size:.82em}
 .ch7-tbl tfoot tr{background:#4a6580}
@@ -2375,7 +2399,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .fttx-card .ch7-tbl thead th:nth-child(2),.fttx-card .ch7-tbl tbody td:nth-child(2),.fttx-card .ch7-tbl tfoot td:nth-child(2){width:30%}
 .fttx-card .ch7-tbl thead th:nth-child(3),.fttx-card .ch7-tbl tbody td:nth-child(3),.fttx-card .ch7-tbl tfoot td:nth-child(3){width:30%}
 .ch7-dl{background:none;border:none;cursor:pointer;font-size:1em;color:#aab;padding:2px 5px;border-radius:3px;line-height:1;transition:color .12s,background .12s}
-.ch7-dl:hover{color:#2c3e50;background:#e8ecef}
+.ch7-dl:hover{color:#133458;background:#e8ecef}
 .ch7-empty{padding:14px 15px;color:#888;font-style:italic;font-size:.88em}
 .ch7-await{padding:24px 0;color:#aaa;font-size:.92em}
 .ch7-info-card{background:white;border-radius:6px;border:1px solid #dee2e6;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:18px}
@@ -2383,7 +2407,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-info-tbl tr{border-bottom:1px solid #f0f0f0}
 .ch7-info-tbl tr:last-child{border-bottom:none}
 .ch7-info-tbl td{padding:8px 14px}
-.ch7-info-tbl td:first-child{font-weight:600;color:#2c3e50;width:180px;background:#f8f9fa}
+.ch7-info-tbl td:first-child{font-weight:600;color:#133458;width:180px;background:#f8f9fa}
 .ch7-info-multi{font-size:.82em;color:#888;font-style:italic;padding:10px 14px}
 .ch7-card-hdr.fttx{background:#6b5b45}
 </style>
@@ -2731,17 +2755,25 @@ function buildTable(aggRows, detailArr, colLabel, prefix, order, warnNA, greyRow
       var ep = document.createElement("p"); ep.className="ch7-empty"; ep.textContent="Keine Daten."; return ep;
     }
     var hasBaulos  = aggRows[0].nBaulos !== null;
-    var totalTotal = aggRows.reduce(function(s,r) { return s+r.nTotal; }, 0);
+var totalTotal = aggRows.reduce(function(s,r) { return s+r.nTotal; }, 0);
     var totalBl    = hasBaulos ? aggRows.reduce(function(s,r) { return s+(r.nBaulos||0); }, 0) : null;
-    var anzahlHead = hasBaulos ? "Baulos\u00a0/\u00a0Total" : "Anzahl";
-    var totalFoot  = hasBaulos
+    var fdLabel = selFD.length === 1
+      ? (selFD[0] === "Feeder Level" ? "Total Feeder" : selFD[0] === "Drop Level" ? "Total Drop" : "Total")
+      : "Total";
+var fdWord = selFD.length === 1 ? (selFD[0] === "Feeder Level" ? "Feeder" : selFD[0] === "Drop Level" ? "Drop" : "") : "";
+    var anzahlHead = hasBaulos
+      ? ("Baulos\u00a0/\u00a0Total" + (fdWord ? "<span style='display:block;text-align:right'>" + fdWord + "</span>" : ""))
+      : (selFD.length ? fdLabel : "Anzahl");    var totalFoot  = hasBaulos
       ? (totalBl + "\u00a0/\u00a0" + totalTotal.toLocaleString("de"))
       : totalTotal.toLocaleString("de");
+    var totalPctFoot = totalTotal === 0 ? "0%" : "100%";
     var sorted = order ? aggRows : aggRows.filter(function(r) { return r.cat === "NA / leer"; }).concat(aggRows.filter(function(r) { return r.cat !== "NA / leer"; }));
     var tbl = document.createElement("table"); tbl.className="ch7-tbl";
     tbl.innerHTML =
-      "<thead><tr><th>"+colLabel+"</th><th class='r'>"+anzahlHead+"</th><th class='r p'>%</th><th></th></tr></thead>" +
-      "<tfoot><tr><td>Total</td><td class='r'>"+totalFoot+"</td><td class='r'>100%</td><td></td></tr></tfoot>";
+      tbl.innerHTML =
+            "<thead><tr><th>"+colLabel+"</th><th class='r' style='line-height:1.3;text-align:right'>"+anzahlHead+"</th><th class='r p'>%</th><th></th></tr></thead>" +
+
+"<tfoot><tr><td>"+fdLabel+"</td><td class='r'>"+totalFoot+"</td><td class='r'>"+totalPctFoot+"</td><td></td></tr></tfoot>";
     var tb = document.createElement("tbody");
     sorted.forEach(function(row) {
       var isNA   = row.cat === "NA / leer";
@@ -3012,6 +3044,25 @@ Projekte werden die Zahlen über alle ausgewählten Projekte aufsummiert.
 
 ---
 
+## DQ
+
+```{r dq-overview-kpis}
+tagList(
+  kpi_group("Datenqualität",
+    kpi_box(n_hp_leer_exec,
+            paste0("HP behind fehlt (", round(100 * n_hp_leer_exec / n_total, 1), "% ohne storniert)"),
+            "warn"),
+    kpi_box(n_missing_all_parcel,
+            paste0("Alle 3 Katasterfelder fehlen (", round(100 * n_missing_all_parcel / n_total, 1), "% ohne storniert)"),
+            "warn")
+  )
+)
+```
+
+---
+
+
+
 ## Informationen/Quellen
 
 ### Metadaten
@@ -3027,7 +3078,7 @@ tibble(
     striped   = TRUE,
     highlight = TRUE,
     theme = reactableTheme(
-      headerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
+      headerStyle  = list(background = "#133458", color = "white", fontWeight = "bold"),
       stripedColor = "#f8f9fa"
     )
   )
@@ -3050,7 +3101,7 @@ project_list_full %>%
     bordered        = TRUE,
     defaultPageSize = 25,
     theme = reactableTheme(
-      headerStyle  = list(background = "#2c3e50", color = "white", fontWeight = "bold"),
+      headerStyle  = list(background = "#133458", color = "white", fontWeight = "bold"),
       stripedColor = "#f8f9fa"
     )
   )
