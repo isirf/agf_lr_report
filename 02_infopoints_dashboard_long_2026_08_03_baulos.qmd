@@ -29,8 +29,8 @@ base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_i
 input_path = paste0(base_path, "input_files/")
 
 # ↓↓↓ update these for every new export ↓↓↓
-infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_07_27.csv"
-infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_03.csv"
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_03.csv"
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_10.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "LR_Report_Gemeinden_2027_07_27.xlsx"
 fttx_file                = "Queries_FttxLocations_2026_08_04.csv"
@@ -559,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
 ```{r dynamic-title, results='asis'}
 # inject the report title with the infopoints export date into the html
 cat(sprintf(
-  '<h1 style="margin-top:1em; color:#133458;">Infopoints — Data Quality Check <small style="font-size:0.55em; color:#888; font-weight:400;">Datenstand: %s</small></h1>',
+  '<h1 style="margin-top:1em; color:#133458;">Infopoints im Überblick <small style="font-size:0.55em; color:#888; font-weight:400;">Datenstand: %s</small></h1>',
   infopoints_export_date
 ))
 ```
@@ -797,18 +797,12 @@ tagList(
             "Feeder gebaut ohne LR — Bau fertig", "warn")
   ),
 
-  kpi_group("Abgeltungen",
+kpi_group("Abgeltungen",
     kpi_box(n_payment_yes,
             paste0("Payment required = Yes (", round(100 * n_payment_yes / n_total, 1), "% ohne storniert)"),
             "warn"),
     kpi_box(n_qualifiziert,
             paste0("Qualifiziert: Built & receive (", round(100 * n_qualifiziert / n_payment_yes, 1), "% der Abgeltungen)"),
-            "warn"),
-    kpi_box(n_gruppe_a,
-            paste0("A — Zahlen & payed setzen (", round(100 * n_gruppe_a / max(n_recv_built_exec, 1), 1), "% von receive+gebaut)"),
-            "warn"),
-    kpi_box(n_gruppe_b,
-            paste0("B — Klären: Costs leer (", round(100 * n_gruppe_b / max(n_recv_built_exec, 1), 1), "% von receive+gebaut)"),
             "warn")
   )
 )
@@ -1045,8 +1039,20 @@ download_btn(
 
 ## Kapitel 2: Abgeltungen, Built und HP dahinter
 
-### 2.1 Abgeltungen — Datencheck
+```{r abgeltung-action-kpis}
+tagList(
+  kpi_group("Handlungsbedarf (receive + gebaut)",
+    kpi_box(n_gruppe_a,
+            paste0("A — Zahlen & payed setzen (", round(100 * n_gruppe_a / max(n_recv_built_exec, 1), 1), "% von receive+gebaut)"),
+            "warn"),
+    kpi_box(n_gruppe_b,
+            paste0("B — Klären: Costs leer (", round(100 * n_gruppe_b / max(n_recv_built_exec, 1), 1), "% von receive+gebaut)"),
+            "warn")
+  )
+)
+```
 
+### 2.1 Abgeltungen — Datencheck
 #### 2.1.1 Payment required = Yes, aber Costs leer
 
 Infopoints, bei denen eine Zahlung erforderlich ist, aber kein Kostenbetrag eingetragen wurde.
