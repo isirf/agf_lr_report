@@ -48,7 +48,7 @@ mdu_sn_path              = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfa
 infopoints_path          = paste0(input_path, infopoints_file)
 infopoints_prev_path     = paste0(input_path, infopoints_file_prev)
 infopoints_enriched_path = paste0(input_path, infopoints_enriched_file)
-excel_path               = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting LR;SN/Projektzuordnung PB PCM Status_aktuell.xlsx"
+excel_path               = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting_LR_SN/Projektzuordnung PB PCM Status_aktuell.xlsx"
 
 # export date parsed from infopoints_file's name
 infopoints_export_date = infopoints_file %>%
@@ -56,7 +56,7 @@ infopoints_export_date = infopoints_file %>%
   str_replace_all("_", "-")
 if (is.na(infopoints_export_date)) infopoints_export_date = "unbekannt"
 
-lr_status_history_path = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting LR;SN/LR-Statusentwicklung_piha_neu.xlsx"
+lr_status_history_path = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting_LR_SN/LR-Statusentwicklung_piha_neu.xlsx"
 
 # fail fast with a clear message rather than a cryptic read_csv2 error
 all_input_files = c(infopoints_path, infopoints_enriched_path, excel_path, lr_status_history_path)
@@ -3524,8 +3524,12 @@ tagList(
 
 ```{r metadata-table}
 tibble(
-  Feld  = c("Version", "Erstellt am", "Datenstand (Infopoints)", "Infopoints-Datei", "Projektliste-Datei", "Baulos-Datei"),
-  Wert  = c(version_number, as.character(today), infopoints_export_date, infopoints_file, excel_file, baulos_lookup_file)
+  Feld  = c("Version", "Erstellt am", "Datenstand (Infopoints)",
+            "Infopoints-Datei (privates LR)", "Infopoints-Datei (MDU)", "Infopoints-Datei (SN)",
+            "Projektliste-Datei", "Baulos-Datei (privates LR)", "Baulos-Datei (MDU)", "Baulos-Datei (SN)"),
+  Wert  = c(version_number, as.character(today), infopoints_export_date,
+            infopoints_file, mdu_file, sn_file,
+            basename(excel_path), baulos_lookup_file, baulos_lookup_mdu_file, baulos_lookup_sn_file)
 ) %>%
   reactable(
     sortable  = FALSE,
