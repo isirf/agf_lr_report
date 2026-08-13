@@ -613,7 +613,7 @@ document.addEventListener('DOMContentLoaded', function() {
     header.classList.add('collapsed');
   });
 
-  allCollapsed = true;
+allCollapsed = true;
   document.getElementById('toggle-btn').textContent = 'Alles ausklappen';
 });
 </script>
@@ -2597,6 +2597,20 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 
 ```{=html}
 <style>
+.badge-plr, .badge-mdu, .badge-sn {
+  display: inline-block;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 2px 7px;
+  vertical-align: middle;
+  margin-left: 6px;
+  line-height: 1.6;
+}
+.badge-plr { background: #133458; color: white; }
+.badge-mdu { background: #914F1E; color: white; }
+.badge-sn  { background: #6F4C5B; color: white; }
 .ch7-sel-label{font-size:.78em;font-weight:700;color:#133458;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;display:block}
 .ch7-count{font-size:.78em;color:#888;margin-top:3px}
 .ch7-filters-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:16px;align-items:start}
@@ -2681,8 +2695,125 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 .ch7-tbl.sn  tfoot tr{background:#9E7777; color:#fff}
 </style>
 
+<div id="tab-source-badges" style="display:flex;gap:6px;margin-bottom:12px;"></div>
+<script>
+(function() {
+  var BADGE = {
+    plr: { label: "Privates LR", color: "#133458" },
+    mdu: { label: "MDU",         color: "#914F1E" },
+    sn:  { label: "SN",          color: "#6F4C5B" }
+  };
+  var TAB_SOURCES = {
+    "Executive Summary":                             ["plr"],
+    "Kapitel 1: Status-Übersicht nach Projekt":      ["plr"],
+    "Kapitel 2: Abgeltungen, Built und HP dahinter": ["plr"],
+    "Kapitel 3: Zeitkomponente":                     ["plr"],
+    "Kapitel 4: Bau/Planung-Kontext":                ["plr"],
+    "Kapitel 5: Gebaut ohne Leitungsrecht":          ["plr"],
+    "Kapitel 6: LR im Zeitverlauf":                  ["plr"],
+    "Kapitel 7: Projektseiten":                      ["plr", "mdu", "sn"],
+    "DQ":                                            ["plr"],
+    "Informationen/Quellen":                         ["plr"]
+  };
+  function makeBadge(key) {
+    var b = BADGE[key];
+    var span = document.createElement("span");
+    span.style.cssText = "display:inline-block;font-size:0.72em;font-weight:700;letter-spacing:0.05em;border-radius:4px;padding:3px 9px;background:" + b.color + ";color:white;";
+    span.textContent = b.label;
+    return span;
+  }
+  function updateBadges() {
+    var container = document.getElementById("tab-source-badges");
+    if (!container) return;
+    container.innerHTML = "";
+    var active = document.querySelector(".panel-tabset [role='tab'][aria-selected='true']");
+    if (!active) return;
+    // strip any child element text (badge spans) — use only direct text nodes
+    var label = Array.from(active.childNodes)
+      .filter(function(n) { return n.nodeType === 3; })
+      .map(function(n) { return n.textContent; })
+      .join("").trim();
+    // partial match — tab label starts with key
+    var sources = ["plr"];
+    Object.keys(TAB_SOURCES).forEach(function(k) {
+      if (label.startsWith(k) || k.startsWith(label)) sources = TAB_SOURCES[k];
+    });
+    sources.forEach(function(key) { container.appendChild(makeBadge(key)); });
+    // move container to just inside the active tab panel
+    var panelId = active.getAttribute("aria-controls");
+    var panel = panelId ? document.getElementById(panelId) : null;
+    if (panel) {
+      panel.insertBefore(container, panel.firstChild);
+    }
+  }
+  function init() {
+    updateBadges();
+    document.querySelectorAll(".panel-tabset [role='tab']").forEach(function(tab) {
+      tab.addEventListener("click", function() { setTimeout(updateBadges, 80); });
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() { setTimeout(init, 400); });
+  } else {
+    setTimeout(init, 400);
+  }
+})();
+</script>
+
+
+<div id="tab-source-badges" style="position:fixed;top:14px;right:24px;z-index:1000;display:flex;gap:6px;align-items:center;"></div>
+<script>
+(function() {
+  var BADGE = {
+    plr: { label: "Privates LR", color: "#133458" },
+    mdu: { label: "MDU",         color: "#914F1E" },
+    sn:  { label: "SN",          color: "#6F4C5B" }
+  };
+
+  var TAB_SOURCES = {
+    "Executive Summary":                             ["plr"],
+    "Kapitel 1: Status-Übersicht nach Projekt":      ["plr"],
+    "Kapitel 2: Abgeltungen, Built und HP dahinter": ["plr"],
+    "Kapitel 3: Zeitkomponente \u2014 \"Applied for\" & \"Open\"": ["plr"],
+    "Kapitel 4: Bau/Planung-Kontext":                ["plr"],
+    "Kapitel 5: Gebaut ohne Leitungsrecht":          ["plr"],
+    "Kapitel 6: LR im Zeitverlauf":                  ["plr"],
+    "Kapitel 7: Projektseiten":                      ["plr", "mdu", "sn"],
+    "DQ":                                            ["plr"],
+    "Informationen/Quellen":                         ["plr"]
+  };
+
+  function makeBadge(key) {
+    var b = BADGE[key];
+    var span = document.createElement("span");
+    span.style.cssText = "display:inline-block;font-size:0.72em;font-weight:700;letter-spacing:0.05em;border-radius:4px;padding:3px 9px;background:" + b.color + ";color:white;";
+    span.textContent = b.label;
+    return span;
+  }
+
+  function updateBadges() {
+    var container = document.getElementById("tab-source-badges");
+    if (!container) return;
+    container.innerHTML = "";
+    var active = document.querySelector(".panel-tabset [role='tab'][aria-selected='true']");
+    if (!active) return;
+    var label = active.textContent.trim();
+    var sources = TAB_SOURCES[label] || ["plr"];
+    sources.forEach(function(key) { container.appendChild(makeBadge(key)); });
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    updateBadges();
+    document.querySelectorAll(".panel-tabset [role='tab']").forEach(function(tab) {
+      tab.addEventListener("click", function() {
+        setTimeout(updateBadges, 50);
+      });
+    });
+  });
+})();
+</script>
 <div id="ch7">
-  <div class="ch7-filters-row">
+<div class="ch7-filters-row">
     <div class="ch7-filter-col">
       <label class="ch7-sel-label">Projekt suchen</label>
       <input class="ch7-search" id="ch7s" type="text" placeholder="Projekt suchen…">
