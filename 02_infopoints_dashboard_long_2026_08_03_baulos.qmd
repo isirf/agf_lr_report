@@ -29,17 +29,17 @@ base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_i
 input_path = paste0(base_path, "input_files/")
 
 # ↓↓↓ update these for every new export ↓↓↓
-infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_03.csv"
-infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_10.csv"
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_10.csv"
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_17.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "Projektzuordnung PB PCM Status_aktuell.xlsx"
-fttx_file                = "Queries_FttxLocations_2026_08_04.csv"
-baulos_lookup_file       = "baulos_lookup_2026_08_05.csv"
-baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_08_04.csv"
-mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_08_12.csv"
-sn_file                  = "Customized_InfoLocations_SN_2026_08_12.csv"
-baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_08_12.csv"
-baulos_lookup_sn_file    = "baulos_lookup_sn_2026_08_12.csv"
+fttx_file                = "Queries_FttxLocations_2026_08_17.csv"
+baulos_lookup_file       = "baulos_lookup_2026_08_17.csv"
+baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_08_17.csv"
+mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_08_17.csv"
+sn_file                  = "Customized_InfoLocations_SN_2026_08_17.csv"
+baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_08_17.csv"
+baulos_lookup_sn_file    = "baulos_lookup_sn_2026_08_17.csv"
 # ↑↑↑ update these for every new export ↑↑↑
 
 fttx_path                = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/"
