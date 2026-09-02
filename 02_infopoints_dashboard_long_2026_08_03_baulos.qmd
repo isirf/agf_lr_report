@@ -27,23 +27,24 @@ version_number = "1.1"
 
 base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/"
 input_path = paste0(base_path, "input_files/")
+fttx_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/"
+mdu_sn_path   = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/"
 
 # ↓↓↓ update these for every new export ↓↓↓
-infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_17.csv"
-infopoints_file          = "Customized_InfoLocations_privates_LR_2026_08_24.csv"
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_31_feederdropbackbone.csv"
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_09_02.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "Projektzuordnung PB PCM Status_aktuell.xlsx"
-fttx_file                = "Queries_FttxLocations_2026_08_24.csv"
-baulos_lookup_file       = "baulos_lookup_2026_08_24.csv"
-baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_08_24.csv"
-mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_08_24.csv"
-sn_file                  = "Customized_InfoLocations_SN_2026_08_24.csv"
-baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_08_24.csv"
-baulos_lookup_sn_file    = "baulos_lookup_sn_2026_08_24.csv"
+fttx_file                = "Queries_FttxLocations_2026_09_02.csv"
+baulos_lookup_file       = "baulos_lookup_2026_09_02.csv"
+baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_09_02.csv"
+mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_09_02.csv"
+sn_file                  = "Customized_InfoLocations_SN_2026_09_02.csv"
+baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_09_02.csv"
+baulos_lookup_sn_file    = "baulos_lookup_sn_2026_09_02.csv"
+baulos_polygone_date     = "2026-08-05"   # ← update when GeoJSON changes
 # ↑↑↑ update these for every new export ↑↑↑
 
-fttx_path                = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/"
-mdu_sn_path              = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/"
 
 infopoints_path          = paste0(input_path, infopoints_file)
 infopoints_prev_path     = paste0(input_path, infopoints_file_prev)
@@ -70,8 +71,8 @@ if (length(missing_files) > 0) {
 }
 
 # load infopoints
-infopoints_all = read_csv2(infopoints_path, name_repair = "minimal") %>%
-  select(-last_col())
+infopoints_all = read_csv2(infopoints_path, name_repair = "unique", show_col_types = FALSE) %>%
+  select(-matches("^\\.\\.\\.\\d+$"))
 
 yes_no_cols = c("built", "Payment required", "canceled", "payed")
 infopoints_all = infopoints_all %>%
@@ -124,8 +125,8 @@ mdu_path = paste0(mdu_sn_path, mdu_file)
 sn_path  = paste0(mdu_sn_path, sn_file)
 
 if (file.exists(mdu_path)) {
-  mdu_all = read_csv2(mdu_path, name_repair = "minimal", show_col_types = FALSE) %>%
-    select(-last_col()) %>%
+  mdu_all = read_csv2(mdu_path, name_repair = "unique", show_col_types = FALSE) %>%
+    select(-matches("^\\.\\.\\.\\d+$")) %>%
     mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
   mdu = mdu_all %>%
     filter(`Planned by` %in% meilenstein_projects) %>%
@@ -137,8 +138,8 @@ if (file.exists(mdu_path)) {
 }
 
 if (file.exists(sn_path)) {
-  sn_all = read_csv2(sn_path, name_repair = "minimal", show_col_types = FALSE) %>%
-    select(-last_col()) %>%
+  sn_all = read_csv2(sn_path, name_repair = "unique", show_col_types = FALSE) %>%
+    select(-matches("^\\.\\.\\.\\d+$")) %>%
     mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
   sn = sn_all %>%
     filter(`Planned by` %in% meilenstein_projects) %>%
@@ -235,8 +236,8 @@ if (file.exists(fttx_full_path)) {
 
 # load previous week's infopoints for kpi trend arrows
 if (file.exists(infopoints_prev_path)) {
-  infopoints_all_prev = read_csv2(infopoints_prev_path, name_repair = "minimal") %>%
-    select(-last_col()) %>%
+  infopoints_all_prev = read_csv2(infopoints_prev_path, name_repair = "unique", show_col_types = FALSE) %>%
+    select(-matches("^\\.\\.\\.\\d+$")) %>%
     mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
   infopoints_prev = infopoints_all_prev %>%
     filter(`Planned by` %in% meilenstein_projects) %>%
@@ -529,7 +530,7 @@ main#quarto-document-content {
 .kpi-box .kpi-val  { font-size: 1.7em; font-weight: bold; color: #133458; line-height: 1.1; }
 .kpi-box.warn .kpi-val { color: #D99B21; }
 .kpi-box.ok   .kpi-val { color: #838921; }
-.kpi-box .kpi-lbl  { font-size: 0.78em; color: #666; margin-top: 4px; }
+.kpi-box .kpi-lbl  { font-size: 0.92em; color: #666; margin-top: 4px; }
 .kpi-box .kpi-pct  { font-size: 0.78em; color: #666; margin-top: 2px; }
 .kpi-box.gesamt .kpi-lbl { font-weight: 700; color: #444; }
 .kpi-box.grayed { border-left-color: #dee2e6; }
@@ -644,6 +645,7 @@ n_status_open        = sum(infopoints$Status == "open",        na.rm = TRUE)
 n_status_applied     = sum(infopoints$Status == "applied for", na.rm = TRUE)
 n_status_rejected    = sum(infopoints$Status == "rejected",    na.rm = TRUE)
 n_status_no_response = sum(str_to_lower(str_trim(infopoints$Status)) == "no response", na.rm = TRUE)
+n_status_borderline  = sum(str_to_lower(str_trim(infopoints$Status)) == "borderline case", na.rm = TRUE)
 n_status_na          = sum(is.na(infopoints$Status) | infopoints$Status == "")
 
 # abgeltungen: datenchecks
@@ -700,35 +702,35 @@ n_missing_all_parcel = infopoints %>%
 
 # feeder ohne lr — total: all feeder-level infopoints not yet at status = receive
 n_feeder_no_lr = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive")) %>%
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive")) %>%
   nrow()
 
 # broken down by bau_planung phase
 n_feeder_no_lr_planung    = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          Bau_Planung == "Planung") %>% nrow()
 n_feeder_no_lr_im_bau     = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          Bau_Planung == "im Bau") %>% nrow()
 n_feeder_no_lr_bau_fertig = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          Bau_Planung == "Bau fertig") %>% nrow()
 
 # feeder gebaut ohne lr — subset of above that's also already built
 n_feeder_built_no_lr = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          built == "Yes") %>%
   nrow()
 
 # broken down by bau_planung phase
 n_feeder_built_no_lr_planung    = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          built == "Yes" & Bau_Planung == "Planung") %>% nrow()
 n_feeder_built_no_lr_im_bau     = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          built == "Yes" & Bau_Planung == "im Bau") %>% nrow()
 n_feeder_built_no_lr_bau_fertig = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
          built == "Yes" & Bau_Planung == "Bau fertig") %>% nrow()
 
 
@@ -740,17 +742,18 @@ if (!is.null(infopoints_prev)) {
   prev_status_applied     = sum(infopoints_prev$Status == "applied for", na.rm = TRUE)
   prev_status_rejected    = sum(infopoints_prev$Status == "rejected",    na.rm = TRUE)
   prev_status_no_resp     = sum(str_to_lower(str_trim(infopoints_prev$Status)) == "no response", na.rm = TRUE)
+  prev_status_borderline  = sum(str_to_lower(str_trim(infopoints_prev$Status)) == "borderline case", na.rm = TRUE)
   prev_status_na          = sum(is.na(infopoints_prev$Status) | infopoints_prev$Status == "")
   prev_built_no_receive   = infopoints_prev %>%
     filter(built == "Yes" & (is.na(Status) | Status != "receive")) %>% nrow()
   prev_feeder_no_lr       = infopoints_prev %>%
-    filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive")) %>% nrow()
+    filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive")) %>% nrow()
   prev_feeder_built_no_lr = infopoints_prev %>%
-    filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") &
+    filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") &
            built == "Yes") %>% nrow()
 } else {
   prev_n_total = prev_status_receive = prev_status_open = prev_status_applied =
-  prev_status_rejected = prev_status_no_resp = prev_status_na =
+  prev_status_rejected = prev_status_no_resp = prev_status_borderline = prev_status_na =
   prev_built_no_receive = prev_feeder_no_lr = prev_feeder_built_no_lr = NA
 }
 
@@ -827,6 +830,10 @@ tagList(
                    round(100 * n_status_no_response / n_total, 1),
                    "no response", "warn",
                    trend = trend_arrow(n_status_no_response, prev_status_no_resp, "down_good")),
+    kpi_box_status(n_status_borderline,
+                   round(100 * n_status_borderline / n_total, 1),
+                   "borderline case", "warn",
+                   trend = trend_arrow(n_status_borderline, prev_status_borderline, "down_good")),
     kpi_box_status(n_status_na,
                    round(100 * n_status_na / n_total, 1),
                    "NA / leer", "warn",
@@ -997,14 +1004,14 @@ na_status_callout(infopoints)
 
 ---
 
-### 1.3 Status und FeederDrop Level
+### 1.3 Status und FeederDropBackbone
 
 ```{r status-feederdrop}
 status_by_feederdrop = infopoints %>%
   na_label() %>%
-  group_by(Status, `FeederDrop Level`) %>%
+  group_by(Status, FeederDropBackbone) %>%
   summarise(n = n(), .groups = "drop") %>%
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
+  pivot_wider(names_from = FeederDropBackbone, values_from = n, values_fill = 0) %>%
   add_col_totals() %>%
   mutate(Total = rowSums(across(where(is.numeric)))) %>%
   relocate(Total, .after = Status) %>%
@@ -1012,13 +1019,13 @@ status_by_feederdrop = infopoints %>%
 ```
 
 ```{r status-feederdrop-table}
-rt(status_by_feederdrop, title = "Infopoints nach Status und FeederDrop Level")
+rt(status_by_feederdrop, title = "Infopoints nach Status und FeederDropBackbone")
 ```
 
 ```{r dl-status-feederdrop}
 download_btn(
   summary_df       = status_by_feederdrop,
-  raw_df           = infopoints %>% select(`External ID`, `Planned by`, Status, `FeederDrop Level`),
+  raw_df           = infopoints %>% select(`External ID`, `Planned by`, Status, FeederDropBackbone),
   filename_summary = "1-3_status_feederdrop_summary.csv",
   filename_raw     = "1-3_status_feederdrop_raw.csv"
 )
@@ -1030,16 +1037,16 @@ na_status_callout(infopoints)
 
 #### 1.3.1 Fehlende FeederDrop-Informationen nach Projekt
 
-Projekte, bei denen Infopoints keinen FeederDrop Level eingetragen haben (weder Drop Level noch Feeder Level).
+Projekte, bei denen Infopoints keinen FeederDropBackbone eingetragen haben (weder Drop Level noch Feeder Level).
 
 ```{r feederdrop-missing-by-project}
 feederdrop_missing_by_project = infopoints %>%
   group_by(`Planned by`, PB) %>%
   summarise(
     Total          = n(),
-    `Drop Level`   = sum(`FeederDrop Level` == "Drop Level",   na.rm = TRUE),
-    `Feeder Level` = sum(`FeederDrop Level` == "Feeder Level", na.rm = TRUE),
-    `NA`           = sum(is.na(`FeederDrop Level`) | `FeederDrop Level` == ""),
+    `Drop Level`   = sum(FeederDropBackbone == "Drop Level",   na.rm = TRUE),
+    `Feeder Level` = sum(FeederDropBackbone == "Feeder Level", na.rm = TRUE),
+    `NA`           = sum(is.na(FeederDropBackbone) | FeederDropBackbone == ""),
     .groups = "drop"
   ) %>%
   filter(`NA` > 0) %>%
@@ -1052,9 +1059,9 @@ feederdrop_missing_by_pb = infopoints %>%
   group_by(PB) %>%
   summarise(
     Total          = n(),
-    `Drop Level`   = sum(`FeederDrop Level` == "Drop Level",   na.rm = TRUE),
-    `Feeder Level` = sum(`FeederDrop Level` == "Feeder Level", na.rm = TRUE),
-    `NA`           = sum(is.na(`FeederDrop Level`) | `FeederDrop Level` == ""),
+    `Drop Level`   = sum(FeederDropBackbone == "Drop Level",   na.rm = TRUE),
+    `Feeder Level` = sum(FeederDropBackbone == "Feeder Level", na.rm = TRUE),
+    `NA`           = sum(is.na(FeederDropBackbone) | FeederDropBackbone == ""),
     .groups = "drop"
   ) %>%
   filter(`NA` > 0) %>%
@@ -1074,8 +1081,8 @@ rt(feederdrop_missing_by_pb, title = "Fehlende FeederDrop-Informationen nach PB"
 download_btn(
   summary_df       = feederdrop_missing_by_pb,
   raw_df           = infopoints %>%
-    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") %>%
-    select(`External ID`, `Planned by`, PB, Status, `FeederDrop Level`),
+    filter(is.na(FeederDropBackbone) | FeederDropBackbone == "") %>%
+    select(`External ID`, `Planned by`, PB, Status, FeederDropBackbone),
   filename_summary = "1-3-1_feederdrop_missing_pb_summary.csv",
   filename_raw     = "1-3-1_feederdrop_missing_raw.csv"
 )
@@ -1091,8 +1098,8 @@ rt(feederdrop_missing_by_project, title = "Fehlende FeederDrop-Informationen nac
 download_btn(
   summary_df       = feederdrop_missing_by_project,
   raw_df           = infopoints %>%
-    filter(is.na(`FeederDrop Level`) | `FeederDrop Level` == "") %>%
-    select(`External ID`, `Planned by`, PB, Status, `FeederDrop Level`),
+    filter(is.na(FeederDropBackbone) | FeederDropBackbone == "") %>%
+    select(`External ID`, `Planned by`, PB, Status, FeederDropBackbone),
   filename_summary = "1-3-1_feederdrop_missing_project_summary.csv",
   filename_raw     = "1-3-1_feederdrop_missing_project_raw.csv"
 )
@@ -1917,7 +1924,7 @@ download_btn(
   summary_df       = built_no_lr_by_status,
   raw_df           = built_no_lr %>%
     select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built,
-           `FeederDrop Level`, `Building Type`),
+           FeederDropBackbone, `Building Type`),
   filename_summary = "6-1_built_no_lr_status_summary.csv",
   filename_raw     = "6-1_built_no_lr_raw.csv"
 )
@@ -1925,15 +1932,15 @@ download_btn(
 
 ---
 
-### 5.2 Nach FeederDrop Level
+### 5.2 Nach FeederDropBackbone
 
 ```{r built-no-lr-by-feederdrop}
 built_no_lr_by_feederdrop = built_no_lr %>%
-  mutate(`FeederDrop Level` = if_else(
-    is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-    "NA / leer", `FeederDrop Level`
+  mutate(FeederDropBackbone = if_else(
+    is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+    "NA / leer", FeederDropBackbone
   )) %>%
-  group_by(`FeederDrop Level`) %>%
+  group_by(FeederDropBackbone) %>%
   summarise(Total = n(), .groups = "drop") %>%
   arrange(desc(Total)) %>%
   add_col_totals() %>%
@@ -1941,14 +1948,14 @@ built_no_lr_by_feederdrop = built_no_lr %>%
 ```
 
 ```{r built-no-lr-by-feederdrop-table}
-rt(built_no_lr_by_feederdrop, title = "Gebaut ohne LR — nach FeederDrop Level")
+rt(built_no_lr_by_feederdrop, title = "Gebaut ohne LR — nach FeederDropBackbone")
 ```
 
 ```{r dl-built-no-lr-feederdrop}
 download_btn(
   summary_df       = built_no_lr_by_feederdrop,
   raw_df           = built_no_lr %>%
-    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
+    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, FeederDropBackbone),
   filename_summary = "6-2_built_no_lr_feederdrop_summary.csv",
   filename_raw     = "6-2_built_no_lr_feederdrop_raw.csv"
 )
@@ -1982,7 +1989,7 @@ rt(built_no_lr_by_bauplanung, title = "Gebaut ohne LR — nach Bau/Planung-Phase
 download_btn(
   summary_df       = built_no_lr_by_bauplanung,
   raw_df           = built_no_lr %>%
-    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
+    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, FeederDropBackbone),
   filename_summary = "6-3_built_no_lr_bauplanung_summary.csv",
   filename_raw     = "6-3_built_no_lr_bauplanung_raw.csv"
 )
@@ -1990,18 +1997,18 @@ download_btn(
 
 ---
 
-### 5.4 Kreuztabelle: Status × FeederDrop Level
+### 5.4 Kreuztabelle: Status × FeederDropBackbone
 
 ```{r built-no-lr-crosstab}
 built_no_lr_crosstab = built_no_lr %>%
   na_label("Status") %>%
-  mutate(`FeederDrop Level` = if_else(
-    is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-    "NA / leer", `FeederDrop Level`
+  mutate(FeederDropBackbone = if_else(
+    is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+    "NA / leer", FeederDropBackbone
   )) %>%
-  group_by(Status, `FeederDrop Level`) %>%
+  group_by(Status, FeederDropBackbone) %>%
   summarise(n = n(), .groups = "drop") %>%
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
+  pivot_wider(names_from = FeederDropBackbone, values_from = n, values_fill = 0) %>%
   add_col_totals() %>%
   mutate(Total = rowSums(across(where(is.numeric)))) %>%
   relocate(Total, .after = Status) %>%
@@ -2010,14 +2017,14 @@ built_no_lr_crosstab = built_no_lr %>%
 ```
 
 ```{r built-no-lr-crosstab-table}
-rt(built_no_lr_crosstab, title = "Gebaut ohne LR — Status × FeederDrop Level")
+rt(built_no_lr_crosstab, title = "Gebaut ohne LR — Status × FeederDropBackbone")
 ```
 
 ```{r dl-built-no-lr-crosstab}
 download_btn(
   summary_df       = built_no_lr_crosstab,
   raw_df           = built_no_lr %>%
-    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
+    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, FeederDropBackbone),
   filename_summary = "6-4_built_no_lr_crosstab_summary.csv",
   filename_raw     = "6-4_built_no_lr_crosstab_raw.csv"
 )
@@ -2029,13 +2036,13 @@ download_btn(
 
 ```{r built-no-lr-by-project}
 built_no_lr_by_project = built_no_lr %>%
-  mutate(`FeederDrop Level` = if_else(
-    is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-    "NA / leer", `FeederDrop Level`
+  mutate(FeederDropBackbone = if_else(
+    is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+    "NA / leer", FeederDropBackbone
   )) %>%
-  group_by(`Planned by`, PB, Bau_Planung, `FeederDrop Level`) %>%
+  group_by(`Planned by`, PB, Bau_Planung, FeederDropBackbone) %>%
   summarise(n = n(), .groups = "drop") %>%
-  pivot_wider(names_from = `FeederDrop Level`, values_from = n, values_fill = 0) %>%
+  pivot_wider(names_from = FeederDropBackbone, values_from = n, values_fill = 0) %>%
   mutate(
     `Drop Level`   = if ("Drop Level"   %in% names(pick(everything()))) `Drop Level`   else 0L,
     `Feeder Level` = if ("Feeder Level" %in% names(pick(everything()))) `Feeder Level` else 0L,
@@ -2049,14 +2056,14 @@ built_no_lr_by_project = built_no_lr %>%
 ```
 
 ```{r built-no-lr-by-project-table}
-rt(built_no_lr_by_project, title = "Gebaut ohne LR — nach Projekt und FeederDrop Level")
+rt(built_no_lr_by_project, title = "Gebaut ohne LR — nach Projekt und FeederDropBackbone")
 ```
 
 ```{r dl-built-no-lr-project}
 download_btn(
   summary_df       = built_no_lr_by_project,
   raw_df           = built_no_lr %>%
-    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, `FeederDrop Level`),
+    select(`External ID`, `Planned by`, PB, Bau_Planung, Status, built, FeederDropBackbone),
   filename_summary = "6-5_built_no_lr_project_summary.csv",
   filename_raw     = "6-5_built_no_lr_project_raw.csv"
 )
@@ -2084,11 +2091,63 @@ names(lr_status_history_raw)[1:7] = c(
   "kw", "Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"
 )
 
+# add Borderline_Case column if not present (skip silently for older files)
+if (!"Borderline_Case" %in% names(lr_status_history_raw)) {
+  lr_status_history_raw$Borderline_Case = NA_real_
+}
+
 lr_status_history = lr_status_history_raw %>%
   mutate(kw = str_trim(kw)) %>%
   filter(!is.na(kw) & kw != "") %>%
-  mutate(across(c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response),
+  mutate(across(c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response, Borderline_Case),
                 ~ suppressWarnings(as.numeric(.x)))) %>%
+  mutate(kw_order = row_number())
+
+# ── backfill missing weeks from historical infopoints exports ─────────────────
+# add one entry per file for weeks not already in the excel archive
+backfill_files = c(
+  "KW 31" = paste0(input_path, "Customized_InfoLocations_privates_LR_2026_07_27.csv"),
+  "KW 32" = paste0(input_path, "Customized_InfoLocations_privates_LR_2026_08_03.csv"),
+  "KW 33" = paste0(input_path, "Customized_InfoLocations_privates_LR_2026_08_10.csv"),
+  "KW 34" = paste0(input_path, "Customized_InfoLocations_privates_LR_2026_08_17.csv"),
+  "KW 35" = paste0(input_path, "Customized_InfoLocations_privates_LR_2026_08_24.csv")
+)
+
+for (kw_label in names(backfill_files)) {
+  fpath = backfill_files[[kw_label]]
+  if (!kw_label %in% lr_status_history$kw && file.exists(fpath)) {
+    bf_raw = read_csv2(fpath, name_repair = "unique", show_col_types = FALSE) %>%
+      select(-matches("^\\.\\.\\.\\d+$")) %>%
+      mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
+
+    bf_active = bf_raw %>%
+      filter(`Planned by` %in% meilenstein_projects) %>%
+      left_join(project_list, by = "Planned by")
+
+    bf_ip = bf_active %>%
+      filter(is.na(Status) | str_to_lower(str_trim(Status)) != "canceled")
+
+    new_row = bf_ip %>%
+      summarise(
+        kw              = kw_label,
+        Abgelehnt       = sum(Status == "rejected",                                 na.rm = TRUE),
+        Angesucht       = sum(Status == "applied for",                              na.rm = TRUE),
+        Erhalten        = sum(Status == "receive",                                  na.rm = TRUE),
+        Offen           = sum(Status == "open",                                     na.rm = TRUE),
+        Storniert       = nrow(bf_active) - nrow(bf_ip),
+        No_Response     = sum(str_to_lower(str_trim(Status)) == "no response",     na.rm = TRUE),
+        Borderline_Case = sum(str_to_lower(str_trim(Status)) == "borderline case", na.rm = TRUE)
+      ) %>%
+      mutate(kw_order = as.integer(str_extract(kw_label, "\\d+")) + 0.5)
+
+    lr_status_history = bind_rows(lr_status_history, new_row)
+    cat(sprintf("  backfilled %s from %s\n", kw_label, basename(fpath)))
+  }
+}
+
+# re-sort by kw_order so backfilled rows appear in the right position
+lr_status_history = lr_status_history %>%
+  arrange(kw_order) %>%
   mutate(kw_order = row_number())
 
 # auto-append current week from infopoints export
@@ -2098,13 +2157,14 @@ current_kw_label = paste0("KW ", formatC(current_kw_num, width = 2, flag = "0"))
 if (!current_kw_label %in% lr_status_history$kw) {
   current_row = infopoints %>%
     summarise(
-      kw          = current_kw_label,
-      Abgelehnt   = sum(Status == "rejected",                                    na.rm = TRUE),
-      Angesucht   = sum(Status == "applied for",                                 na.rm = TRUE),
-      Erhalten    = sum(Status == "receive",                                     na.rm = TRUE),
-      Offen       = sum(Status == "open",                                        na.rm = TRUE),
-      Storniert   = nrow(infopoints_active) - nrow(infopoints),
-      No_Response = sum(str_to_lower(str_trim(Status)) == "no response",        na.rm = TRUE)
+      kw              = current_kw_label,
+      Abgelehnt       = sum(Status == "rejected",                                    na.rm = TRUE),
+      Angesucht       = sum(Status == "applied for",                                 na.rm = TRUE),
+      Erhalten        = sum(Status == "receive",                                     na.rm = TRUE),
+      Offen           = sum(Status == "open",                                        na.rm = TRUE),
+      Storniert       = nrow(infopoints_active) - nrow(infopoints),
+      No_Response     = sum(str_to_lower(str_trim(Status)) == "no response",        na.rm = TRUE),
+      Borderline_Case = sum(str_to_lower(str_trim(Status)) == "borderline case",    na.rm = TRUE)
     ) %>%
     mutate(kw_order = max(lr_status_history$kw_order) + 1)
 
@@ -2120,28 +2180,30 @@ n_lr_weeks = nrow(lr_status_history)
 ```{r lr-status-history-chart, fig.width=14, fig.height=7, out.width='100%'}
 lr_status_long = lr_status_history %>%
   pivot_longer(
-    cols      = c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response),
+    cols      = c(Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response, Borderline_Case),
     names_to  = "Status",
     values_to = "Anzahl"
   ) %>%
+  filter(!is.na(Anzahl)) %>%
   mutate(
     Status = factor(Status,
-      levels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response"),
-      labels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No Response")
+      levels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No_Response", "Borderline_Case"),
+      labels = c("Abgelehnt", "Angesucht", "Erhalten", "Offen", "Storniert", "No Response", "Borderline Case")
     ),
     Status = factor(Status,
-      levels = c("Erhalten", "Storniert", "Offen", "Angesucht", "Abgelehnt", "No Response")
+      levels = c("Erhalten", "Storniert", "Offen", "Angesucht", "Abgelehnt", "No Response", "Borderline Case")
     ),
     kw = factor(kw, levels = lr_status_history$kw)
   )
 
 status_colors = c(
-  "Abgelehnt"   = "#c0392b",
-  "Angesucht"   = "#D99B21",
-  "Erhalten"    = "#838921",
-  "Offen"       = "#3498db",
-  "Storniert"   = "#7f8c8d",
-  "No Response" = "#574964"
+  "Abgelehnt"       = "#c0392b",
+  "Angesucht"       = "#D99B21",
+  "Erhalten"        = "#838921",
+  "Offen"           = "#3498db",
+  "Storniert"       = "#7f8c8d",
+  "No Response"     = "#574964",
+  "Borderline Case" = "#e67e22"
 )
 
 lr_status_gg = ggplot(
@@ -2187,7 +2249,8 @@ ggplotly(lr_status_gg, tooltip = "text") %>%
 
 ```{r lr-status-history-table}
 lr_status_history_display = lr_status_history %>%
-  select(kw, Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response)
+  select(kw, Abgelehnt, Angesucht, Erhalten, Offen, Storniert, No_Response,
+         any_of("Borderline_Case"))
 
 rt(lr_status_history_display, title = "LR-Statusentwicklung je Kalenderwoche")
 ```
@@ -2206,7 +2269,7 @@ download_btn(
 ## Kapitel 7: Projektseiten
 
 Projekt auswählen, um die wichtigsten Kennzahlen ausschließlich für dieses
-Projekt zu sehen: Status-Verteilung, FeederDrop Level, Built-Status und die
+Projekt zu sehen: Status-Verteilung, FeederDropBackbone, Built-Status und die
 Zeitkomponente (applied for / open).
 
 ```{r project-pages-prep}
@@ -2227,7 +2290,7 @@ add_baulos = function(df) {
   )
 }
 
-detail_cols = c("External ID", "Planned by", "Status", "FeederDrop Level", "built", "HP behind")
+detail_cols = c("External ID", "Planned by", "Status", "FeederDropBackbone", "built", "HP behind")
 
 pp_status = infopoints %>%
   na_label("Status") %>%
@@ -2241,20 +2304,20 @@ pp_status_detail = infopoints %>%
   add_baulos()
 
 pp_feederdrop = infopoints %>%
-  mutate(`FeederDrop Level` = if_else(
-    is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-    "NA / leer", `FeederDrop Level`
+  mutate(FeederDropBackbone = if_else(
+    is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+    "NA / leer", FeederDropBackbone
   )) %>%
-  count(`Planned by`, `FeederDrop Level`, name = "n") %>%
-  rename(category = `FeederDrop Level`)
+  count(`Planned by`, FeederDropBackbone, name = "n") %>%
+  rename(category = FeederDropBackbone)
 
 pp_feederdrop_detail = infopoints %>%
-  mutate(`FeederDrop Level` = if_else(
-    is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-    "NA / leer", `FeederDrop Level`
+  mutate(FeederDropBackbone = if_else(
+    is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+    "NA / leer", FeederDropBackbone
   )) %>%
   select(all_of(detail_cols)) %>%
-  mutate(category = `FeederDrop Level`) %>%
+  mutate(category = FeederDropBackbone) %>%
   add_baulos()
 
 pp_built = infopoints %>%
@@ -2323,11 +2386,11 @@ pp_open_detail = open_ip %>%
 # same filter logic as the executive summary's "feeder gebaut ohne lr" kpi,
 # broken down per project. one row per project — count only, no categories.
 pp_feeder_built_no_lr = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
   count(`Planned by`, name = "n")
 
 pp_feeder_built_no_lr_detail = infopoints %>%
-  filter(`FeederDrop Level` == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
+  filter(FeederDropBackbone == "Feeder Level" & (is.na(Status) | Status != "receive") & built == "Yes") %>%
   select(all_of(detail_cols)) %>%
   mutate(category = "Feeder gebaut ohne LR") %>%
   add_baulos()
@@ -2428,18 +2491,18 @@ build_pp_tables = function(df, add_baulos_fn, detail_cols) {
       add_baulos_fn(),
 
     feederdrop = df %>%
-      mutate(`FeederDrop Level` = if_else(
-        is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-        "NA / leer", `FeederDrop Level`)) %>%
-      count(`Planned by`, `FeederDrop Level`, name = "n") %>%
-      rename(category = `FeederDrop Level`),
+      mutate(FeederDropBackbone = if_else(
+        is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+        "NA / leer", FeederDropBackbone)) %>%
+      count(`Planned by`, FeederDropBackbone, name = "n") %>%
+      rename(category = FeederDropBackbone),
 
     feederdrop_detail = df %>%
-      mutate(`FeederDrop Level` = if_else(
-        is.na(`FeederDrop Level`) | str_trim(`FeederDrop Level`) == "",
-        "NA / leer", `FeederDrop Level`)) %>%
+      mutate(FeederDropBackbone = if_else(
+        is.na(FeederDropBackbone) | str_trim(FeederDropBackbone) == "",
+        "NA / leer", FeederDropBackbone)) %>%
       select(all_of(detail_cols)) %>%
-      mutate(category = `FeederDrop Level`) %>%
+      mutate(category = FeederDropBackbone) %>%
       add_baulos_fn(),
 
     built = df %>%
@@ -2498,13 +2561,13 @@ build_pp_tables = function(df, add_baulos_fn, detail_cols) {
       add_baulos_fn(),
 
     feeder_no_lr = df %>%
-      filter(`FeederDrop Level` == "Feeder Level" &
+      filter(FeederDropBackbone == "Feeder Level" &
              (is.na(Status) | Status != "receive") &
              built == "Yes") %>%
       count(`Planned by`, name = "n"),
 
     feeder_no_lr_detail = df %>%
-      filter(`FeederDrop Level` == "Feeder Level" &
+      filter(FeederDropBackbone == "Feeder Level" &
              (is.na(Status) | Status != "receive") &
              built == "Yes") %>%
       select(all_of(detail_cols)) %>%
@@ -2526,6 +2589,36 @@ build_pp_tables = function(df, add_baulos_fn, detail_cols) {
 
 pp_mdu = build_pp_tables(mdu, add_baulos_mdu, detail_cols)
 pp_sn  = build_pp_tables(sn,  add_baulos_sn,  detail_cols)
+
+# sn fertigstellungsanzeigen: erhalten = has a date in "Completion notification"
+# add column silently if not present in the SN file yet
+if (!"Completion notification" %in% names(sn)) {
+  sn$`Completion notification` = NA_character_
+}
+
+sn_with_baulos = sn %>%
+  left_join(baulos_lookup_sn %>% select(`External ID`, baulos_name),
+            by = "External ID")
+
+pp_sn_fertig = sn_with_baulos %>%
+  mutate(
+    fertig_cat = if_else(
+      !is.na(`Completion notification`) & str_trim(as.character(`Completion notification`)) != "",
+      "Erhalten", "Nicht erhalten"
+    )
+  ) %>%
+  group_by(`Planned by`, fertig_cat, baulos_name) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  rename(category = fertig_cat)
+
+pp_sn_fertig_detail = sn_with_baulos %>%
+  mutate(
+    category = if_else(
+      !is.na(`Completion notification`) & str_trim(as.character(`Completion notification`)) != "",
+      "Erhalten", "Nicht erhalten"
+    )
+  ) %>%
+  select(all_of(detail_cols), baulos_name, category)
 ```
 
 ```{r project-pages-json}
@@ -2589,7 +2682,9 @@ ch7_data = list(
   sn_feeder_no_lr            = pp_sn$feeder_no_lr,
   sn_feeder_no_lr_detail     = pp_sn$feeder_no_lr_detail,
   sn_hp_missing              = pp_sn$hp_missing,
-  sn_hp_missing_detail       = pp_sn$hp_missing_detail
+  sn_hp_missing_detail       = pp_sn$hp_missing_detail,
+  sn_fertig                  = pp_sn_fertig,
+  sn_fertig_detail           = pp_sn_fertig_detail
 )
 json_str = jsonlite::toJSON(ch7_data, auto_unbox = TRUE, na = "null")
 cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', json_str))
@@ -2825,11 +2920,12 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
       <label class="ch7-sel-label">Baulos</label>
       <div class="ch7-fd-list" id="ch7bl-list" style="max-height:140px;overflow-y:auto;"></div>
       <button class="ch7-clear-btn" id="ch7blc" onclick="ch7ClearBaulos()">✕ Baulos zurücksetzen</button>
-      <label class="ch7-sel-label" style="margin-top:14px">FeederDrop Level</label>
+      <label class="ch7-sel-label" style="margin-top:14px">Feeder/Drop/Backbone</label>
       <div class="ch7-fd-list">
         <label class="ch7-fd-item"><input type="checkbox" id="ch7fd0" value="Drop Level"> Drop Level</label>
         <label class="ch7-fd-item"><input type="checkbox" id="ch7fd1" value="Feeder Level"> Feeder Level</label>
-        <label class="ch7-fd-item"><input type="checkbox" id="ch7fd2" value="NA / leer"> NA / leer</label>
+        <label class="ch7-fd-item"><input type="checkbox" id="ch7fd2" value="Backbone"> Backbone</label>
+        <label class="ch7-fd-item"><input type="checkbox" id="ch7fd3" value="NA / leer"> NA / leer</label>
       </div>
       <button class="ch7-clear-btn" id="ch7fdclear" onclick="ch7ClearFD()">✕ FeederDrop zurücksetzen</button>
     </div>
@@ -2921,7 +3017,9 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     sn_feeder_no_lr:         raw.sn_feeder_no_lr         || [],
     sn_feeder_no_lr_detail:  raw.sn_feeder_no_lr_detail  || [],
     sn_hp_missing:           raw.sn_hp_missing           || [],
-    sn_hp_missing_detail:    raw.sn_hp_missing_detail    || []
+    sn_hp_missing_detail:    raw.sn_hp_missing_detail    || [],
+    sn_fertig:               raw.sn_fertig               || [],
+    sn_fertig_detail:        raw.sn_fertig_detail        || []
   };
 
   var selected  = [];
@@ -2931,7 +3029,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
   var selBP     = "";
   var selFD     = [];
 
-  var FD_IDS = ["ch7fd0","ch7fd1","ch7fd2"];
+  var FD_IDS = ["ch7fd0","ch7fd1","ch7fd2","ch7fd3"];
   FD_IDS.forEach(function(id) {
     document.getElementById(id).addEventListener("change", function() {
       selFD = FD_IDS.map(function(i) { return document.getElementById(i); })
@@ -3149,7 +3247,7 @@ function buildPCMList() {
   }
 
   function applyFD(rows) {
-    return selFD.length ? rows.filter(function(r) { return selFD.includes(r["FeederDrop Level"]); }) : rows;
+    return selFD.length ? rows.filter(function(r) { return selFD.includes(r["FeederDropBackbone"]); }) : rows;
   }
 
   function sumCats(aggArr, detailArr, catField) {
@@ -3176,9 +3274,9 @@ function buildPCMList() {
     }).sort(function(a,b) { return b.nTotal - a.nTotal; });
   }
 
-  var ALL_FD = ["Drop Level","Feeder Level","NA / leer"];
+  var ALL_FD = ["Drop Level","Feeder Level","Backbone","NA / leer"];
 
-function buildTable(aggRows, detailArr, colLabel, prefix, order, warnNA, greyRows, greenIfZero) {
+function buildTable(aggRows, detailArr, colLabel, prefix, order, warnNA, greyRows, greenIfZero, noPercent) {
     greyRows = greyRows || [];
     greenIfZero = greenIfZero || false;
     if (order) {
@@ -3211,9 +3309,9 @@ var fdWord = selFD.length === 1 ? (selFD[0] === "Feeder Level" ? "Feeder" : selF
     var tbl = document.createElement("table"); tbl.className="ch7-tbl";
     tbl.innerHTML =
       tbl.innerHTML =
-            "<thead><tr><th>"+colLabel+"</th><th class='r' style='line-height:1.3;text-align:right'>"+anzahlHead+"</th><th class='r p'>%</th><th></th></tr></thead>" +
+            "<thead><tr><th>"+colLabel+"</th><th class='r' style='line-height:1.3;text-align:right'>"+anzahlHead+"</th>"+(noPercent?"":"<th class='r p'>%</th>")+"<th></th></tr></thead>" +
 
-"<tfoot><tr><td>"+fdLabel+"</td><td class='r'>"+totalFoot+"</td><td class='r'>"+totalPctFoot+"</td><td></td></tr></tfoot>";
+"<tfoot><tr><td>"+fdLabel+"</td><td class='r'>"+totalFoot+"</td>"+(noPercent?"":"<td class='r'>"+totalPctFoot+"</td>")+"<td></td></tr></tfoot>";
     var tb = document.createElement("tbody");
     sorted.forEach(function(row) {
       var isNA   = row.cat === "NA / leer";
@@ -3232,7 +3330,7 @@ var fdWord = selFD.length === 1 ? (selFD[0] === "Feeder Level" ? "Feeder" : selF
       else if (isNA && !warnNA)        tr.className = "na-red";
       else if (isNA && warnNA)         tr.className = "na-amber";
 else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "na-green" : (!isZero && greenIfZero) ? "na-red" : "na-grey";     tr.innerHTML = "<td>"+row.cat+"</td><td class='r'>"+anzahl+
-        "</td><td class='p'>"+pct+"</td><td style='text-align:center;width:34px;'>"+
+        "</td>"+(noPercent?"":"<td class='p'>"+pct+"</td>")+"<td style='text-align:center;width:34px;'>"+
         "<button class='ch7-dl' title='Rohdaten herunterladen' style='"+(isZero?"visibility:hidden;":"")+"'>\u2b07</button></td>";
    (function(row) {
         tr.querySelector(".ch7-dl").onclick = function() {
@@ -3249,7 +3347,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
   }
 
   var WAIT = ["< 4 Wochen","4\u20138 Wochen","8\u201312 Wochen","> 12 Wochen","Kein Datum"];
-  var ALL_STATUSES = ["open","applied for","receive","rejected","no response","NA / leer"];
+  var ALL_STATUSES = ["open","applied for","receive","rejected","no response","borderline case","NA / leer"];
 
   var CARDS = [
     { title:"Status", col:"Status", prefix:"status",
@@ -3259,7 +3357,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
         var hasBl = selBaulos.length > 0;
         return ALL_STATUSES.map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
       }, detail:DATA.status_detail, order:null },
-    { title:"FeederDrop Level", col:"Level", prefix:"feederdrop",
+    { title:"Feeder/Drop/Backbone", col:"Level", prefix:"feederdrop",
       agg: function() { return sumCats(DATA.feederdrop, DATA.feederdrop_detail, "category"); },
       detail:DATA.feederdrop_detail, order:null },
       { title:"Built (gebaut ja/nein)", col:"Built", prefix:"built",
@@ -3273,6 +3371,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
     { title:"Feeder gebaut ohne LR", col:"Kennzahl", prefix:"feeder_gebaut_ohne_lr",
       greyRows: ["Feeder gebaut ohne LR"],
       greenIfZero: true,
+      noPercent: true,
       agg: function() {
         var nTotal, nBaulos;
         if (selFD.length) {
@@ -3341,7 +3440,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
           var hasBl = selBaulos.length > 0;
           return ALL_STATUSES.map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
         }, detail:d_status_detail, order:null },
-      { title:"FeederDrop Level", col:"Level", prefix:prefix+"_feederdrop",
+      { title:"Feeder/Drop/Backbone", col:"Level", prefix:prefix+"_feederdrop",
         agg: function() { return sumCats(d_feederdrop, d_feederdrop_detail, "category"); },
         detail:d_feederdrop_detail, order:null },
       { title:"Built (gebaut ja/nein)", col:"Built", prefix:prefix+"_built",
@@ -3355,6 +3454,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
       { title:"Feeder gebaut ohne LR", col:"Kennzahl", prefix:prefix+"_feeder_ohne_lr",
         greyRows: ["Feeder gebaut ohne LR"],
         greenIfZero: true,
+        noPercent: true,
         agg: function() {
           var nTotal, nBaulos;
           if (selFD.length) {
@@ -3398,15 +3498,38 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
     DATA.mdu_hp_missing, DATA.mdu_hp_missing_detail
   );
 
-  var CARDS_SN = makeCards("sn",
-    DATA.sn_status, DATA.sn_status_detail,
-    DATA.sn_feederdrop, DATA.sn_feederdrop_detail,
-    DATA.sn_built, DATA.sn_built_detail,
-    DATA.sn_applied_for, DATA.sn_applied_for_detail,
-    DATA.sn_open, DATA.sn_open_detail,
-    DATA.sn_feeder_no_lr, DATA.sn_feeder_no_lr_detail,
-    DATA.sn_hp_missing, DATA.sn_hp_missing_detail
-  );
+  var CARDS_SN = [
+    { title:"Status", col:"Status", prefix:"sn_status",
+      agg: function() {
+        var found = sumCats(DATA.sn_status, DATA.sn_status_detail, "category");
+        var m = new Map(found.map(function(r) { return [r.cat, r]; }));
+        var hasBl = selBaulos.length > 0;
+        return ALL_STATUSES.map(function(s) { return m.get(s) || {cat:s, nTotal:0, nBaulos: hasBl ? 0 : null}; });
+      }, detail:DATA.sn_status_detail, order:null },
+    { title:"Applied for \u2014 Wartezeit", col:"Wartezeit", prefix:"sn_applied_for",
+      agg: function() { return sumCats(DATA.sn_applied_for, DATA.sn_applied_for_detail, "category"); },
+      detail:DATA.sn_applied_for_detail, order:WAIT },
+    { title:"Open \u2014 Wartezeit", col:"Wartezeit", prefix:"sn_open",
+      agg: function() { return sumCats(DATA.sn_open, DATA.sn_open_detail, "category"); },
+      detail:DATA.sn_open_detail, order:WAIT },
+    { title:"Fertigstellungsanzeigen", col:"Status", prefix:"sn_fertig",
+      agg: function() {
+        var FERTIG_CATS = ["Erhalten", "Nicht erhalten"];
+        var mTot = new Map(); var mBl = new Map();
+        DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]); })
+          .forEach(function(r) { var k = r.category || ""; mTot.set(k, (mTot.get(k)||0)+(r.n||0)); });
+        if (selBaulos.length) {
+          DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); })
+            .forEach(function(r) { var k = r.category || ""; mBl.set(k, (mBl.get(k)||0)+(r.n||0)); });
+        }
+        var hasBl = selBaulos.length > 0;
+        return FERTIG_CATS.map(function(s) {
+          return { cat: s, nTotal: mTot.get(s)||0, nBaulos: hasBl ? (mBl.get(s)||0) : null };
+        });
+      },
+      detail: DATA.sn_fertig_detail, order: null,
+      noDownloadWhenZero: true }
+  ];
 
   function buildFttxTable(aggRows) {
     var hasBaulos = selBaulos.length > 0;
@@ -3554,7 +3677,7 @@ if (!selected.length) {
         hdr.appendChild(dlBtn);
       }
       card.appendChild(hdr);
-      card.appendChild(def.isFttx ? buildFttxTable(def.agg()) : buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false));
+      card.appendChild(def.isFttx ? buildFttxTable(def.agg()) : buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false, def.noPercent || false));
 grid.appendChild(card);
     });
 
@@ -3579,7 +3702,7 @@ document.getElementById("ch7-subtitle-mdu").style.display = "block";
       })(def);
       hdr.appendChild(dlBtn);
       card.appendChild(hdr);
-      var tbl = buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false);
+      var tbl = buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false, def.noPercent || false);
       if (tbl.classList) tbl.classList.add("mdu");
       card.appendChild(tbl);
       gridMdu.appendChild(card);
@@ -3594,19 +3717,25 @@ document.getElementById("ch7-subtitle-mdu").style.display = "block";
       var hdr  = document.createElement("div"); hdr.className = "ch7-card-hdr sn";
       var titleSpan = document.createElement("span"); titleSpan.textContent = def.title;
       hdr.appendChild(titleSpan);
-      var dlBtn = document.createElement("button"); dlBtn.className = "ch7-card-dl";
-      dlBtn.textContent = "\u2b07 Download";
-      (function(def) {
-        dlBtn.onclick = function() {
-          var rows = applyFD(def.detail.filter(function(r) {
-            return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name));
-          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
-          dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
-        };
-      })(def);
-      hdr.appendChild(dlBtn);
+      // for fertigstellungsanzeigen: only show download when total > 0
+      var aggRows = def.agg();
+      var totalN  = aggRows.reduce(function(s,r) { return s + (r.nTotal||0); }, 0);
+      var showDl  = !def.noDownloadWhenZero || totalN > 0;
+      if (showDl) {
+        var dlBtn = document.createElement("button"); dlBtn.className = "ch7-card-dl";
+        dlBtn.textContent = "\u2b07 Download";
+        (function(def) {
+          dlBtn.onclick = function() {
+            var rows = def.detail.filter(function(r) {
+              return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name));
+            }).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+            dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
+          };
+        })(def);
+        hdr.appendChild(dlBtn);
+      }
       card.appendChild(hdr);
-var tbl = buildTable(def.agg(), def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false);
+      var tbl = buildTable(aggRows, def.detail, def.col, def.prefix, def.order, def.warnNA || false, def.greyRows || [], def.greenIfZero || false, def.noPercent || false);
       if (tbl.classList) tbl.classList.add("sn");
       card.appendChild(tbl);
       gridSn.appendChild(card);
@@ -3655,12 +3784,16 @@ tagList(
 
 ```{r metadata-table}
 tibble(
-  Feld  = c("Version", "Erstellt am", "Datenstand (Infopoints)",
-            "Infopoints-Datei (privates LR)", "Infopoints-Datei (MDU Durchleitung)", "Infopoints-Datei (SN)",
-            "Projektliste-Datei", "Baulos-Datei (privates LR)", "Baulos-Datei (MDU Durchleitung)", "Baulos-Datei (SN)"),
-  Wert  = c(version_number, as.character(today), infopoints_export_date,
-            infopoints_file, mdu_file, sn_file,
-            basename(excel_path), baulos_lookup_file, baulos_lookup_mdu_file, baulos_lookup_sn_file)
+  Feld               = c("Version", "Erstellt am", "Datenstand (Infopoints)",
+                         "Infopoints-Datei (privates LR)", "Infopoints-Datei (MDU Durchleitung)", "Infopoints-Datei (SN)",
+                         "Projektliste-Datei",
+                         "Baulos-Datei (privates LR)", "Baulos-Datei (MDU Durchleitung)", "Baulos-Datei (SN)",
+                         "Baulos Polygone"),
+  `Information/Stand` = c(version_number, as.character(today), infopoints_export_date,
+                           infopoints_file, mdu_file, sn_file,
+                           basename(excel_path),
+                           baulos_lookup_file, baulos_lookup_mdu_file, baulos_lookup_sn_file,
+                           baulos_polygone_date)
 ) %>%
   reactable(
     sortable  = FALSE,

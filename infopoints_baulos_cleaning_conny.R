@@ -10,7 +10,7 @@ pacman::p_load(tidyverse, readxl, sf, writexl)
 
 # load data ------------------------------------------------------------------------------------------------------------
 
-construction_cluster_sf = read_sf("/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/baulos_construction-clusters_at_magenta_2026-08-05.geojson")
+construction_cluster_sf = read_sf("/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction-clusters_at_magenta_2026-08-31.geojson")
 
 project_list = read_excel("/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/input_files/LR_Report_Gemeinden_2027_07_27.xlsx",
                           sheet = "Gemeinde PB Zuordnung")
@@ -48,7 +48,7 @@ construction_cluster_cleaned_rimo_projects_active_projects = construction_cluste
 
 # data export ----------------------------------------------------------------------------------------------------------
 
-writexl::write_xlsx(construction_cluster_cleaned_rimo_projects_active_projects, "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/baulos_construction-clusters_at_magenta_2026-08-05_cleaned.xlsx")
+writexl::write_xlsx(construction_cluster_cleaned_rimo_projects_active_projects, "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction-clusters_at_magenta_2026-08-31_cleaned.xlsx")
 
 
 

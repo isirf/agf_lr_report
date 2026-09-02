@@ -17,15 +17,15 @@ input_path = file.path(base_path, "input_files/")
 
 infopoints_file = "Customized_InfoLocations_privates_LR_2026_08_24.csv"
 excel_file      = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting_LR_SN/Projektzuordnung PB PCM Status_aktuell.xlsx"
-baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/baulos_construction-clusters_at_magenta_2026-08-05.geojson"
-fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/Queries_FttxLocations_2026_08_24.csv"
-mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_08_24.csv"
-sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_08_24.csv"
+baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction-clusters_at_magenta_2026-08-31.geojson"
+fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/Queries_FttxLocations_2026_09_02.csv"
+mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_09_02.csv"
+sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_09_02.csv"
 
-output_file          = file.path(input_path, "baulos_lookup_2026_08_24.csv")
-fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_08_24.csv")
-mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_08_24.csv")
-sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_08_24.csv")
+output_file          = file.path(input_path, "baulos_lookup_2026_09_02.csv")
+fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_09_02.csv")
+mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_09_02.csv")
+sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_09_02.csv")
 
 # fail fast ---------------------------------------------------------------------------------------------------------------
 
