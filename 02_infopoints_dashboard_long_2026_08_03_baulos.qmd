@@ -31,17 +31,17 @@ fttx_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf
 mdu_sn_path   = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/"
 
 # ↓↓↓ update these for every new export ↓↓↓
-infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_08_31_feederdropbackbone.csv"
-infopoints_file          = "Customized_InfoLocations_privates_LR_2026_09_02.csv"
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_09_02.csv"
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_09_04.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "Projektzuordnung PB PCM Status_aktuell.xlsx"
-fttx_file                = "Queries_FttxLocations_2026_09_02.csv"
-baulos_lookup_file       = "baulos_lookup_2026_09_02.csv"
-baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_09_02.csv"
-mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_09_02.csv"
-sn_file                  = "Customized_InfoLocations_SN_2026_09_02.csv"
-baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_09_02.csv"
-baulos_lookup_sn_file    = "baulos_lookup_sn_2026_09_02.csv"
+fttx_file                = "Queries_FttxLocations_2026_09_04.csv"
+baulos_lookup_file       = "baulos_lookup_2026_09_04.csv"
+baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_09_04.csv"
+mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_09_04.csv"
+sn_file                  = "Customized_InfoLocations_SN_2026_09_04.csv"
+baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_09_04.csv"
+baulos_lookup_sn_file    = "baulos_lookup_sn_2026_09_04.csv"
 baulos_polygone_date     = "2026-08-05"   # ← update when GeoJSON changes
 # ↑↑↑ update these for every new export ↑↑↑
 
