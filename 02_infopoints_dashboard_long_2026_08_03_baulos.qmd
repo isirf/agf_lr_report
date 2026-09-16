@@ -31,18 +31,18 @@ fttx_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf
 mdu_sn_path   = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/"
 
 # ↓↓↓ update these for every new export ↓↓↓
-infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_09_02.csv"
-infopoints_file          = "Customized_InfoLocations_privates_LR_2026_09_04.csv"
+infopoints_file_prev     = "Customized_InfoLocations_privates_LR_2026_09_04.csv"
+infopoints_file          = "Customized_InfoLocations_privates_LR_2026_09_14.csv"
 infopoints_enriched_file = "infopoints_enriched_2026_05_08.csv"
 excel_file               = "Projektzuordnung PB PCM Status_aktuell.xlsx"
-fttx_file                = "Queries_FttxLocations_2026_09_04.csv"
-baulos_lookup_file       = "baulos_lookup_2026_09_04.csv"
-baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_09_04.csv"
-mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_09_04.csv"
-sn_file                  = "Customized_InfoLocations_SN_2026_09_04.csv"
-baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_09_04.csv"
-baulos_lookup_sn_file    = "baulos_lookup_sn_2026_09_04.csv"
-baulos_polygone_date     = "2026-08-05"   # ← update when GeoJSON changes
+fttx_file                = "Queries_FttxLocations_2026_09_14.csv"
+baulos_lookup_file       = "baulos_lookup_2026_09_14.csv"
+baulos_lookup_fttx_file  = "baulos_lookup_fttx_2026_09_14.csv"
+mdu_file                 = "Customized_InfoLocations_MDU_Durchleitungen_2026_09_14.csv"
+sn_file                  = "Customized_InfoLocations_SN_2026_09_14.csv"
+baulos_lookup_mdu_file   = "baulos_lookup_mdu_2026_09_14.csv"
+baulos_lookup_sn_file    = "baulos_lookup_sn_2026_09_14.csv"
+baulos_polygone_date     = "2026-09-14"   # ← update when GeoJSON changes
 # ↑↑↑ update these for every new export ↑↑↑
 
 
@@ -199,7 +199,7 @@ pp_baulos_by_project_sn = baulos_lookup_sn %>%
 fttx_full_path   = paste0(fttx_path, fttx_file)
 baulos_fttx_path = paste0(input_path, baulos_lookup_fttx_file)
 
-SCOPING_LEVELS = c("In Scope", "Outside Build Scope", "Non Connectable", "NA / leer")
+SCOPING_LEVELS = c("In Scope", "Outside Build Scope", "Not Connectable", "NA / leer")
 
 if (file.exists(fttx_full_path)) {
   fttx_raw = read_csv2(fttx_full_path, name_repair = "unique", show_col_types = FALSE)
@@ -2987,7 +2987,7 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
     hp_missing:          raw.hp_missing || [],
     hp_missing_detail:   raw.hp_missing_detail || [],
     fttx:                raw.fttx || [],
-    fttx_scoping_levels: raw.fttx_scoping_levels || ["In Scope","Outside Build Scope","Non Connectable","NA / leer"],
+    fttx_scoping_levels: raw.fttx_scoping_levels || ["In Scope","Outside Build Scope","Not Connectable","NA / leer"],
     baulos_by_project_mdu:   raw.baulos_by_project_mdu  || [],
     mdu_status:              raw.mdu_status              || [],
     mdu_status_detail:       raw.mdu_status_detail       || [],
@@ -3512,9 +3512,9 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
     { title:"Open \u2014 Wartezeit", col:"Wartezeit", prefix:"sn_open",
       agg: function() { return sumCats(DATA.sn_open, DATA.sn_open_detail, "category"); },
       detail:DATA.sn_open_detail, order:WAIT },
-    { title:"Fertigstellungsanzeigen", col:"Status", prefix:"sn_fertig",
+    { title:"Fertigstellungsanzeigen", col:"Fertigstellungsanzeige", prefix:"sn_fertig",
       agg: function() {
-        var FERTIG_CATS = ["Erhalten", "Nicht erhalten"];
+      var FERTIG_CATS = ["Erhalten", "Nicht erhalten", "NA / leer"];
         var mTot = new Map(); var mBl = new Map();
         DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]); })
           .forEach(function(r) { var k = r.category || ""; mTot.set(k, (mTot.get(k)||0)+(r.n||0)); });

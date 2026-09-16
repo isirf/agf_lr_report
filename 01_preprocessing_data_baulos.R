@@ -15,17 +15,17 @@ pacman::p_load(tidyverse, readxl, sf)
 base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/"
 input_path = file.path(base_path, "input_files/")
 
-infopoints_file = "Customized_InfoLocations_privates_LR_2026_09_04.csv"
+infopoints_file = "Customized_InfoLocations_privates_LR_2026_09_14.csv"
 excel_file      = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting_LR_SN/Projektzuordnung PB PCM Status_aktuell.xlsx"
-baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction-clusters_at_magenta_2026-08-31.geojson"
-fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/Queries_FttxLocations_2026_09_04.csv"
-mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_09_04.csv"
-sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_09_04.csv"
+baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction_clusters_202609140903.gpkg"
+fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/Queries_FttxLocations_2026_09_14.csv"
+mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_09_14.csv"
+sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_09_14.csv"
 
-output_file          = file.path(input_path, "baulos_lookup_2026_09_04.csv")
-fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_09_04.csv")
-mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_09_04.csv")
-sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_09_04.csv")
+output_file          = file.path(input_path, "baulos_lookup_2026_09_14.csv")
+fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_09_14.csv")
+mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_09_14.csv")
+sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_09_14.csv")
 
 # fail fast ---------------------------------------------------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ baulos_sf = sf::st_read(baulos_path, quiet = TRUE) %>%
   sf::st_make_valid() %>%
   select(baulos_name = Name, ProjectId) %>%
   mutate(ProjectId = as.character(ProjectId)) %>%
-  filter(!sf::st_is_empty(geometry))
+  filter(!sf::st_is_empty(geom))
 
 cat(sprintf("  %d baulos polygons loaded\n", nrow(baulos_sf)))
 
