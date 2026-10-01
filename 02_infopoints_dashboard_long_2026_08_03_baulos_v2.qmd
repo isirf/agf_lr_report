@@ -76,6 +76,7 @@ infopoints_all = read_csv2(infopoints_path, name_repair = "unique", show_col_typ
 
 yes_no_cols = c("built", "Payment required", "canceled", "payed")
 infopoints_all = infopoints_all %>%
+  mutate(`Planned by` = str_trim(`Planned by`)) %>%
   mutate(across(all_of(yes_no_cols), ~ str_to_title(str_trim(.x))))
 
 # load full project list for quellen page
@@ -91,6 +92,7 @@ project_list = project_list_full %>%
   filter(Bau_Planung != "on hold") %>%
   select(`Planned by`, PB, PCM, LR_Akquise, Bau_Planung,
          ende_bau_passiv_plan, project_id_ods) %>%
+  mutate(`Planned by` = str_trim(`Planned by`)) %>%
   distinct()
 
 meilenstein_projects = unique(project_list$`Planned by`)
@@ -195,6 +197,19 @@ pp_baulos_by_project_sn = baulos_lookup_sn %>%
   distinct(`Planned by`, baulos_name) %>%
   arrange(`Planned by`, baulos_name)
 
+# helper: one row per location with
+#   baulos_name = first baulos alphabetically (primary, used for display)
+#   baulos_all  = all baulos the location lies in, separated by "|" (used by the baulos filter)
+# so locations in overlapping baulos are found in every one of them, but still counted once in totals
+collapse_baulos = function(lookup) {
+  lookup %>%
+    filter(!is.na(baulos_name)) %>%
+    group_by(`External ID`) %>%
+    summarise(baulos_all  = paste(sort(unique(baulos_name)), collapse = "|"),
+              baulos_name = min(baulos_name),
+              .groups = "drop")
+}
+
 # fttx locations
 fttx_full_path   = paste0(fttx_path, fttx_file)
 baulos_fttx_path = paste0(input_path, baulos_lookup_fttx_file)
@@ -221,17 +236,19 @@ if (file.exists(fttx_full_path)) {
       rename(`Planned by` = `POP cluster`)
   } else {
     warning("baulos_lookup_fttx not found — run preprocessing_baulos.R first.")
+    message("!!! baulos_lookup_fttx not found: ", baulos_fttx_path)
     baulos_lookup_fttx = tibble(`External ID` = character(),
                                 `Planned by`  = character(),
                                 baulos_name   = character())
   }
   fttx = fttx %>%
-    left_join(baulos_lookup_fttx %>% select(`External ID`, baulos_name), by = "External ID")
+    left_join(collapse_baulos(baulos_lookup_fttx), by = "External ID")
+  message(sprintf("fttx baulos join: %d of %d fttx rows have a baulos_name", sum(!is.na(fttx$baulos_name)), nrow(fttx)))
 } else {
   warning("fttx file not found — fttx card will be empty.")
   fttx = tibble(`External ID` = character(), `Planned by` = character(),
                 Scoping = character(), `Planned TU` = numeric(),
-                baulos_name = character())
+                baulos_name = character(), baulos_all = character())
 }
 
 # load previous week's infopoints for kpi trend arrows
@@ -257,6 +274,23 @@ n_projects_all        = project_list_full %>%
   distinct(Gemeinden) %>%
   nrow()
 n_projects_meilenstein = n_distinct(infopoints$`Planned by`, na.rm = TRUE)
+
+# diagnostic (console only): projects in project list without non-canceled infopoints in the report
+missing_projects = setdiff(meilenstein_projects, unique(infopoints$`Planned by`))
+diag_lines = character()
+for (p in missing_projects) {
+  all_names = unique(infopoints_all$`Planned by`)
+  message(sprintf("project without infopoints in report: '%s' | rows in csv: %d (canceled: %d) | similar names in csv: %s",
+                  p, sum(infopoints_all$`Planned by` == p, na.rm = TRUE),
+                  sum(infopoints_all$`Planned by` == p & str_to_lower(str_trim(infopoints_all$Status)) == "canceled", na.rm = TRUE),
+                  paste(all_names[agrepl(p, all_names, max.distance = 0.2, ignore.case = TRUE)], collapse = " ; ")))
+  diag_lines = c(diag_lines, sprintf("'%s' | rows in csv: %d (canceled: %d) | similar names: %s",
+                  p, sum(infopoints_all$`Planned by` == p, na.rm = TRUE),
+                  sum(infopoints_all$`Planned by` == p & str_to_lower(str_trim(infopoints_all$Status)) == "canceled", na.rm = TRUE),
+                  paste(all_names[agrepl(p, all_names, max.distance = 0.2, ignore.case = TRUE)], collapse = " ; ")))
+}
+writeLines(c(sprintf("projects in list: %d, with active infopoints: %d", length(meilenstein_projects), n_projects_meilenstein), diag_lines),
+           "missing_projects_diagnostic.txt")
 today                  = Sys.Date()
 
 # helpers
@@ -2281,13 +2315,10 @@ Zeitkomponente (applied for / open).
 # rows (not just counts) so a per-row download button can export exactly
 # the infopoints behind that number.
 
-# helper: add baulos_name to any detail table
+# helper: add baulos_name / baulos_all to any detail table
 # left join so infopoints without a baulos match keep all their rows (baulos_name = NA)
 add_baulos = function(df) {
-  df %>% left_join(
-    baulos_lookup %>% select(`External ID`, baulos_name) %>% slice_min(baulos_name, by = `External ID`, with_ties = FALSE),
-    by = "External ID"
-  )
+  df %>% left_join(collapse_baulos(baulos_lookup), by = "External ID")
 }
 
 detail_cols = c("External ID", "Planned by", "Status", "FeederDropBackbone", "built", "HP behind")
@@ -2409,14 +2440,16 @@ pp_hp_missing_detail = infopoints %>%
   mutate(category = Status) %>%
   add_baulos()
 
-pp_projects = infopoints %>%
+# all active (non on-hold) projects from the project list, so chapter 7 matches the project count on page 1
+# (projects without privates-lr infopoints stay selectable: they may still have mdu / sn / fttx data)
+pp_projects = project_list %>%
   distinct(`Planned by`) %>%
   filter(!is.na(`Planned by`)) %>%
   arrange(`Planned by`) %>%
   pull(`Planned by`)
 
 # info box: one row per project with pcm, bau_planung, ende_bau_passiv_plan
-pp_info = infopoints %>%
+pp_info = project_list %>%
   distinct(`Planned by`, PB, PCM, Bau_Planung, ende_bau_passiv_plan) %>%
   filter(!is.na(`Planned by`))
 
@@ -2424,7 +2457,7 @@ pp_info = infopoints %>%
 # rows: fixed scoping categories
 # columns per row: scoping, n (count of addresses), sum_tu (sum of planned tu)
 pp_fttx = fttx %>%
-  group_by(`Planned by`, Scoping, baulos_name) %>%
+  group_by(`Planned by`, Scoping, baulos_all) %>%
   summarise(
     n      = n(),
     sum_tu = sum(`Planned TU`, na.rm = TRUE),
@@ -2433,19 +2466,10 @@ pp_fttx = fttx %>%
 
 # helper for mdu and sn baulos joins
 add_baulos_mdu = function(df) {
-  df %>% left_join(
-    baulos_lookup_mdu %>% select(`External ID`, baulos_name) %>% slice_min(baulos_name, by = `External ID`, with_ties = FALSE),
-    by = "External ID"
-  )
+  df %>% left_join(collapse_baulos(baulos_lookup_mdu), by = "External ID")
 }
 add_baulos_sn = function(df) {
-  df %>% left_join(
-    baulos_lookup_sn %>% select(`External ID`, baulos_name) %>% slice_min(baulos_name, by = `External ID`, with_ties = FALSE),
-    by = "External ID"
-  )
-}
-add_baulos_sn = function(df) {
-  df %>% left_join(baulos_lookup_sn %>% select(`External ID`, baulos_name), by = "External ID")
+  df %>% left_join(collapse_baulos(baulos_lookup_sn), by = "External ID")
 }
 
 # mdu pp tables
@@ -2597,8 +2621,7 @@ if (!"Completion notification" %in% names(sn)) {
 }
 
 sn_with_baulos = sn %>%
-  left_join(baulos_lookup_sn %>% select(`External ID`, baulos_name),
-            by = "External ID")
+  left_join(collapse_baulos(baulos_lookup_sn), by = "External ID")
 
 pp_sn_fertig = sn_with_baulos %>%
   mutate(
@@ -2607,7 +2630,7 @@ pp_sn_fertig = sn_with_baulos %>%
       "Erhalten", "Nicht erhalten"
     )
   ) %>%
-  group_by(`Planned by`, fertig_cat, baulos_name) %>%
+  group_by(`Planned by`, fertig_cat, baulos_all) %>%
   summarise(n = n(), .groups = "drop") %>%
   rename(category = fertig_cat)
 
@@ -2618,7 +2641,7 @@ pp_sn_fertig_detail = sn_with_baulos %>%
       "Erhalten", "Nicht erhalten"
     )
   ) %>%
-  select(all_of(detail_cols), baulos_name, category)
+  select(all_of(detail_cols), baulos_name, baulos_all, category)
 ```
 
 ```{r project-pages-json}
@@ -3025,6 +3048,12 @@ cat(sprintf('<script id="ch7-data" type="application/json">\n%s\n</script>', jso
 
   var selected  = [];
   var selBaulos = [];
+  // a row belongs to a selected baulos if any of the baulos it lies in is selected (overlapping baulos)
+  function inBl(r) {
+    if (!selBaulos.length) return true;
+    var a = String(r.baulos_all || r.baulos_name || "").split("|");
+    return selBaulos.some(function(b) { return a.indexOf(b) !== -1; });
+  }
   var selPCM    = "";
   var selPB     = "";
   var selBP     = "";
@@ -3267,7 +3296,7 @@ function buildPCMList() {
     var mBl = null;
     if (selBaulos.length) {
       mBl = new Map();
-      applyFD(detailArr.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); }))
+      applyFD(detailArr.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); }))
         .forEach(function(r) { var k = r.category || ""; mBl.set(k, (mBl.get(k) || 0) + 1); });
     }
     return Array.from(mTot.entries()).map(function(e) {
@@ -3303,7 +3332,7 @@ var fdWord = selFD.length === 1 ? (selFD[0] === "Feeder Level" ? "Feeder" : selF
     var anzahlHead = hasBaulos
       ? ("Baulos\u00a0/\u00a0Total" + (fdWord ? "<span style='display:block;text-align:right'>" + fdWord + "</span>" : ""))
       : (selFD.length ? fdLabel : "Anzahl");    var totalFoot  = hasBaulos
-      ? (totalBl + "\u00a0/\u00a0" + totalTotal.toLocaleString("de"))
+      ? (totalBl.toLocaleString("de") + "\u00a0/\u00a0" + totalTotal.toLocaleString("de"))
       : totalTotal.toLocaleString("de");
     var totalPctFoot = totalTotal === 0 ? "0%" : "100%";
     var sorted = order ? aggRows : aggRows.filter(function(r) { return r.cat === "NA / leer"; }).concat(aggRows.filter(function(r) { return r.cat !== "NA / leer"; }));
@@ -3324,7 +3353,7 @@ var fdWord = selFD.length === 1 ? (selFD[0] === "Feeder Level" ? "Feeder" : selF
         : "\u2014";
       var nBl = row.nBaulos !== null ? (row.nBaulos || 0) : null;
       var anzahl = hasBaulos
-        ? (nBl + "\u00a0/\u00a0" + row.nTotal.toLocaleString("de"))
+        ? (nBl.toLocaleString("de") + "\u00a0/\u00a0" + row.nTotal.toLocaleString("de"))
         : row.nTotal.toLocaleString("de");
       var tr = document.createElement("tr");
       if (isNA && isZero)              tr.className = "na-grey";
@@ -3336,8 +3365,8 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
    (function(row) {
         tr.querySelector(".ch7-dl").onclick = function() {
           var rows = applyFD(detailArr.filter(function(r) {
-            return selected.includes(r["Planned by"]) && r.category === row.cat && (!selBaulos.length || selBaulos.includes(r.baulos_name));
-          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+            return selected.includes(r["Planned by"]) && r.category === row.cat && (!selBaulos.length || inBl(r));
+          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; delete o.baulos_all; return o; });
           dlCSV(rows, prefix+"_"+safe(row.cat)+"_"+fileSuffix()+".csv");
         };
       })(row);
@@ -3380,13 +3409,13 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
           nTotal = fd.length;
           nBaulos = selBaulos.length
             ? DATA.feeder_no_lr_detail.filter(function(r) {
-                return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name);
+                return selected.includes(r["Planned by"]) && inBl(r);
               }).length
             : null;
         } else {
           nTotal = DATA.feeder_no_lr.filter(function(r) { return selected.includes(r["Planned by"]); }).reduce(function(s,r) { return s+(r.n||0); }, 0);
           nBaulos = selBaulos.length
-            ? DATA.feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); }).length
+            ? DATA.feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); }).length
             : null;
         }
         return [{cat:"Feeder gebaut ohne LR", nTotal: nTotal, nBaulos: nBaulos}];
@@ -3412,7 +3441,6 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
         var mN  = new Map();
         var mTU = new Map();
         var rows = DATA.fttx.filter(function(r) { return selected.includes(r["Planned by"]); });
-        if (selBaulos.length) rows = rows.filter(function(r) { return selBaulos.includes(r.baulos_name); });
         rows.forEach(function(r) {
           var k = r.Scoping || "NA / leer";
           mN.set(k,  (mN.get(k)  || 0) + (r.n      || 0));
@@ -3421,13 +3449,14 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
         var mNBl  = new Map();
         var mTUBl = new Map();
         if (selBaulos.length) {
-          DATA.fttx.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); }).forEach(function(r) {
+          DATA.fttx.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); }).forEach(function(r) {
             var k = r.Scoping || "NA / leer";
             mNBl.set(k,  (mNBl.get(k)  || 0) + (r.n      || 0));
             mTUBl.set(k, (mTUBl.get(k) || 0) + (r.sum_tu || 0));
           });
         }
-        return levels.map(function(s) { return { cat: s, n: mN.get(s) || 0, sum_tu: mTU.get(s) || 0, nBaulos: selBaulos ? (mNBl.get(s) || 0) : null, sum_tu_baulos: selBaulos ? (mTUBl.get(s) || 0) : null }; });      }, detail:null, order:null }
+        return levels.map(function(s) { return { cat: s, n: mN.get(s) || 0, sum_tu: mTU.get(s) || 0, nBaulos: selBaulos.length ? (mNBl.get(s) || 0) : null, sum_tu_baulos: selBaulos.length ? (mTUBl.get(s) || 0) : null }; });
+      }, detail:null, order:null }
   ];
     function makeCards(prefix, d_status, d_status_detail, d_feederdrop, d_feederdrop_detail,
                      d_built, d_built_detail, d_applied_for, d_applied_for_detail,
@@ -3462,12 +3491,12 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
             var fd = applyFD(d_feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]); }));
             nTotal  = fd.length;
             nBaulos = selBaulos.length
-              ? applyFD(d_feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); })).length
+              ? applyFD(d_feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); })).length
               : null;
           } else {
             nTotal  = d_feeder_no_lr.filter(function(r) { return selected.includes(r["Planned by"]); }).reduce(function(s,r) { return s+(r.n||0); }, 0);
             nBaulos = selBaulos.length
-              ? d_feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); }).length
+              ? d_feeder_no_lr_detail.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); }).length
               : null;
           }
           return [{cat:"Feeder gebaut ohne LR", nTotal:nTotal, nBaulos:nBaulos}];
@@ -3520,7 +3549,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
         DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]); })
           .forEach(function(r) { var k = r.category || ""; mTot.set(k, (mTot.get(k)||0)+(r.n||0)); });
         if (selBaulos.length) {
-          DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]) && selBaulos.includes(r.baulos_name); })
+          DATA.sn_fertig.filter(function(r) { return selected.includes(r["Planned by"]) && inBl(r); })
             .forEach(function(r) { var k = r.category || ""; mBl.set(k, (mBl.get(k)||0)+(r.n||0)); });
         }
         var hasBl = selBaulos.length > 0;
@@ -3540,7 +3569,7 @@ else if (greyRows.includes(row.cat)) tr.className = (isZero && greenIfZero) ? "n
     var totalTUBl = hasBaulos ? aggRows.reduce(function(s,r) { return s + (r.sum_tu_baulos||0); }, 0) : null;
     var sorted = aggRows.filter(function(r) { return r.cat === "NA / leer"; }).concat(aggRows.filter(function(r) { return r.cat !== "NA / leer"; }));
     var adrHead  = hasBaulos ? "Baulos Adressen\u00a0/\u00a0Total Adressen" : "Adressen";
-    var adrFoot  = hasBaulos ? (totalNBl + "\u00a0/\u00a0" + totalN.toLocaleString("de")) : totalN.toLocaleString("de");
+    var adrFoot  = hasBaulos ? (totalNBl.toLocaleString("de") + "\u00a0/\u00a0" + totalN.toLocaleString("de")) : totalN.toLocaleString("de");
     var tuFoot   = hasBaulos ? (Math.round(totalTUBl).toLocaleString("de") + "\u00a0/\u00a0" + Math.round(totalTU).toLocaleString("de")) : Math.round(totalTU).toLocaleString("de");
     var tuHead   = hasBaulos ? "Baulos TU\u00a0/\u00a0Total TU" : "Sum TU";
     var tbl = document.createElement("table"); tbl.className="ch7-tbl";
@@ -3556,7 +3585,7 @@ sorted.forEach(function(row) {
       if (isNA && isZero) tr.className = "na-grey";
       else if (isNA)      tr.className = "na-red";
       var adrCell = hasBaulos
-        ? ((row.nBaulos||0) + "\u00a0/\u00a0" + row.n.toLocaleString("de"))
+        ? ((row.nBaulos||0).toLocaleString("de") + "\u00a0/\u00a0" + row.n.toLocaleString("de"))
         : row.n.toLocaleString("de");
       var tuCell = hasBaulos
         ? (Math.round(row.sum_tu_baulos||0).toLocaleString("de") + "\u00a0/\u00a0" + Math.round(row.sum_tu).toLocaleString("de"))
@@ -3588,7 +3617,7 @@ if (!selected.length) {
     if (selBaulos.length) parts.push("Baulos: " + selBaulos.map(function(b) { return "\u201e"+b+"\u201c"; }).join(", "));
     if (selFD.length) parts.push("FeederDrop: "+selFD.join(", "));
     bnr.style.display = parts.length ? "block" : "none";
-    if (parts.length) bnr.textContent = "\u2139\ufe0f  Filter aktiv \u2014 "+parts.join(" | ")+(selBaulos?" \u2014 Anzahl zeigt Baulos\u00a0/\u00a0Gesamt":"");
+    if (parts.length) bnr.textContent = "\u2139\ufe0f  Filter aktiv \u2014 "+parts.join(" | ")+(selBaulos.length?" \u2014 Anzahl zeigt Baulos\u00a0/\u00a0Gesamt":"");
 
     iw.style.display = "block"; iw.innerHTML = "";
     var infoCard = document.createElement("div"); infoCard.className="ch7-card ch7-info-card";
@@ -3600,7 +3629,7 @@ if (!selected.length) {
         arr.filter(function(r) { return selected.includes(r["Planned by"]); }).forEach(function(r) {
           if (!seen.has(r["External ID"])) {
             seen.add(r["External ID"]);
-            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; out.push(o);
+            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; delete o.baulos_all; out.push(o);
           }
         });
       });
@@ -3609,10 +3638,10 @@ if (!selected.length) {
     function filteredProjectRows() {
       var seen = new Set(); var out = [];
       [DATA.status_detail, DATA.applied_for_detail, DATA.open_detail, DATA.feeder_no_lr_detail, DATA.hp_missing_detail].forEach(function(arr) {
-        applyFD(arr.filter(function(r) { return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name)); })).forEach(function(r) {
+        applyFD(arr.filter(function(r) { return selected.includes(r["Planned by"]) && (!selBaulos.length || inBl(r)); })).forEach(function(r) {
           if (!seen.has(r["External ID"])) {
             seen.add(r["External ID"]);
-            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; out.push(o);
+            var o = Object.assign({}, r); delete o.category; delete o.baulos_name; delete o.baulos_all; out.push(o);
           }
         });
       });
@@ -3670,8 +3699,8 @@ if (!selected.length) {
         (function(def) {
           dlBtn.onclick = function() {
             var rows = applyFD(def.detail.filter(function(r) {
-              return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name));
-            })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+              return selected.includes(r["Planned by"]) && (!selBaulos.length || inBl(r));
+            })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; delete o.baulos_all; return o; });
             dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
           };
         })(def);
@@ -3696,8 +3725,8 @@ document.getElementById("ch7-subtitle-mdu").style.display = "block";
       (function(def) {
         dlBtn.onclick = function() {
           var rows = applyFD(def.detail.filter(function(r) {
-            return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name));
-          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+            return selected.includes(r["Planned by"]) && (!selBaulos.length || inBl(r));
+          })).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; delete o.baulos_all; return o; });
           dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
         };
       })(def);
@@ -3728,8 +3757,8 @@ document.getElementById("ch7-subtitle-mdu").style.display = "block";
         (function(def) {
           dlBtn.onclick = function() {
             var rows = def.detail.filter(function(r) {
-              return selected.includes(r["Planned by"]) && (!selBaulos.length || selBaulos.includes(r.baulos_name));
-            }).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; return o; });
+              return selected.includes(r["Planned by"]) && (!selBaulos.length || inBl(r));
+            }).map(function(r) { var o = Object.assign({},r); delete o.category; delete o.baulos_name; delete o.baulos_all; return o; });
             dlCSV(rows, def.prefix+"_alle_"+fileSuffix()+".csv");
           };
         })(def);

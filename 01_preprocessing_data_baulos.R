@@ -15,21 +15,21 @@ pacman::p_load(tidyverse, readxl, sf)
 base_path  = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/rimo_infopoints/"
 input_path = file.path(base_path, "input_files/")
 
-infopoints_file = "Customized_InfoLocations_privates_LR_2026_09_14.csv"
+infopoints_file = "Customized_InfoLocations_privates_LR_2026_09_28.csv"
 excel_file      = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/AGF EPS - Documents/General/Planung/Privates Leitungsrecht & Sondernutzungen/Reporting_LR_SN/Projektzuordnung PB PCM Status_aktuell.xlsx"
-baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction_clusters_202609140903.gpkg"
-fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/Queries_FttxLocations_2026_09_14.csv"
-mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_09_14.csv"
-sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_09_14.csv"
+baulos_path     = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export/construction_clusters_202609280840.gpkg"
+fttx_file       = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Queries_FttxLocations_2026_09_29.csv"
+mdu_file        = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_MDU_Durchleitungen_2026_09_28.csv"
+sn_file         = "/Users/irf/Library/CloudStorage/OneDrive-AlpenGlasfaserGmbH/agf_data_export_rimo/Customized_InfoLocations_SN_2026_09_28.csv"
 
-output_file          = file.path(input_path, "baulos_lookup_2026_09_14.csv")
-fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_09_14.csv")
-mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_09_14.csv")
-sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_09_14.csv")
+output_file          = file.path(input_path, "baulos_lookup_2026_09_28.csv")
+fttx_output_file     = file.path(input_path, "baulos_lookup_fttx_2026_09_28.csv")
+mdu_output_file      = file.path(input_path, "baulos_lookup_mdu_2026_09_28.csv")
+sn_output_file       = file.path(input_path, "baulos_lookup_sn_2026_09_28.csv")
 
 # fail fast ---------------------------------------------------------------------------------------------------------------
 
-required_files = c(paste0(input_path, infopoints_file), excel_file, baulos_path)
+required_files = c(paste0(input_path, infopoints_file), excel_file, baulos_path, fttx_file, mdu_file, sn_file)
 missing = required_files[!file.exists(required_files)]
 if (length(missing) > 0) stop("file(s) not found — check paths:\n  ", paste(missing, collapse = "\n  "))
 
@@ -92,7 +92,10 @@ run_baulos_join = function(file_path, col_planned_by = "Planned by", label = "lo
     sf::st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
   
   cat(sprintf("running spatial intersection for %s...\n", label))
-  joined = sf::st_join(pts_sf, baulos_sf, join = sf::st_within) %>%
+  # st_intersects (not st_within) so points lying exactly on a polygon edge are matched too
+  joined_all = sf::st_join(pts_sf, baulos_sf, join = sf::st_intersects) %>%
+    sf::st_drop_geometry()
+  joined = joined_all %>%
     sf::st_drop_geometry() %>%
     filter(!is.na(baulos_name))
   
@@ -108,6 +111,21 @@ run_baulos_join = function(file_path, col_planned_by = "Planned by", label = "lo
   
   cat(sprintf("  %d matches kept after project filter\n",       nrow(lookup)))
   cat(sprintf("  %d unique locations matched\n",                n_distinct(lookup$`External ID`)))
+  
+  # diagnostics: why are locations not (or only partly) assigned to a baulos?
+  ids_all     = unique(coords$`External ID`)
+  ids_any     = unique(joined$`External ID`)
+  ids_kept    = unique(lookup$`External ID`)
+  n_in_none   = length(setdiff(ids_all, ids_any))
+  n_wrong_prj = length(setdiff(ids_any, ids_kept))
+  n_multi     = lookup %>% count(`External ID`) %>% filter(n > 1) %>% nrow()
+  cat(sprintf("  diagnostics: %d locations in no baulos polygon | %d only in baulos of another project | %d in several baulos of their project (report assigns only the first alphabetically)\n",
+              n_in_none, n_wrong_prj, n_multi))
+  lost = coords %>%
+    filter(`External ID` %in% setdiff(ids_all, ids_kept)) %>%
+    count(`Planned by`, name = "locations_without_baulos") %>%
+    arrange(desc(locations_without_baulos))
+  if (nrow(lost) > 0) { cat("  projects with locations without baulos:\n"); print(lost, n = 15) }
   cat(sprintf("  %d projects with at least one baulos match\n", n_distinct(lookup$`Planned by`)))
   cat(sprintf("  %d distinct baulos names\n",                   n_distinct(lookup$baulos_name)))
   
@@ -164,7 +182,7 @@ if (!file.exists(fttx_file)) {
   fttx_sf = fttx_coords %>%
     sf::st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
   
-  fttx_joined = sf::st_join(fttx_sf, baulos_sf, join = sf::st_within) %>%
+  fttx_joined = sf::st_join(fttx_sf, baulos_sf, join = sf::st_intersects) %>%
     sf::st_drop_geometry() %>%
     filter(!is.na(baulos_name))
   
